@@ -3,6 +3,8 @@ module Main where
 import qualified Data.Map as Map
 import Data.List
 import Data.Maybe
+import Control.Monad.Reader
+import Control.Monad.Identity
 
 data Person =
   Person { name  :: String
@@ -15,17 +17,14 @@ persons = [(Person "Jacky" [6] 4),(Person "Timmy" [13] 2)]
 dutyDates :: [Int]
 dutyDates = [6, 7, 13, 14, 20, 21, 27, 28]
 
--- splitedDates = Split.splitEvery (List.length persons)
+type Env  =  [(Maybe Person, Int)]
+type Context a = Reader Env a
 
-type Env  =  [(Maybe Person, Int)] 
-
-
-schedule :: Env -> [Person] -> [Int] -> Env
-schedule env _ [] = env
-schedule env ps (d:ds) = schedule (env ++ [(pick env ps d, d)]) ps ds
-
--- countOfElem :: (Eq a) => a -> [a] -> Int
--- countOfElem elem list = length $ filter (\x -> x == elem) list
+schedule :: [Person] -> [Int] -> Context Env
+schedule _ [] = do env <- ask
+                   return env
+schedule ps (d:ds) = do env <- ask
+                        local (const (env ++ [(pick env ps d, d)]))  (schedule ps ds)
 
 pick :: Env -> [Person] -> Int -> Maybe Person
 pick env ps d  
@@ -38,4 +37,6 @@ pick env ps d
 exceeded :: Env -> Maybe Person -> Bool
 exceeded env p = (times $ fromJust p) > length (filter (\x -> fst x == p) env)
 
-                
+
+
+
