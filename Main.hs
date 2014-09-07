@@ -10,9 +10,10 @@ data Person =
   Person { name  :: String
          , dates   :: [Int]
          , times :: Int
+         , cooldown :: Int
          } deriving (Show, Eq)
 
-persons = [(Person "Jacky" [6] 4),(Person "Timmy" [13] 2)]
+persons = [(Person "Jacky" [6] 4 2), (Person "Timmy" [13] 2 2), (Person "Lok" [21] 2 2)]
 
 dutyDates :: [Int]
 dutyDates = [6, 7, 13, 14, 20, 21, 27, 28]
@@ -28,12 +29,24 @@ schedule ps (d:ds) = do env <- ask
                         local (const $ env ++ [(found, d)]) $ schedule ps ds
 
 pick :: [Person] -> Int -> Context (Maybe Person)
-pick ps d = do env <-ask
-               let res = [p | p <- ps,
-                          not $ elem d (dates p),
-                          times p > $ length $ filter (\x -> fst x == Just p) env]
-                 in case res of
-                 [] -> return Nothing
-                 _ -> return $ (Just $ head res)
+pick ps d = let res = filter (\p -> evalJob p d) ps
+            in case res of
+                [] -> return Nothing
+                _ -> do res' <- filterM evalState res
+                        case res' of
+                          [] -> return Nothing
+                          _ -> return $ (Just $ head res')
 
+
+evalJob :: Person -> Int -> Bool
+evalJob p d = not $ elem d (dates p)
+
+evalState :: Person -> Context Bool
+evalState p = do env <- ask
+                 let res = filter (\x -> fst x == Just p) env in
+                  return $ times p > (length $ res)
+
+
+                  -- && (cooldown p <= elemIndex  snd $ last res 
+                 
 
