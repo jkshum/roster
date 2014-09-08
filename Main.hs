@@ -29,24 +29,16 @@ schedule ps (d:ds) = do env <- ask
                         local (const $ env ++ [(found, d)]) $ schedule ps ds
 
 pick :: [Person] -> Int -> Context (Maybe Person)
-pick ps d = let res = filter (\p -> evalJob p d) ps
-            in case res of
-                [] -> return Nothing
-                _ -> do res' <- filterM evalState res
-                        case res' of
-                          [] -> return Nothing
-                          _ -> return $ (Just $ head res')
+pick ps d = do res <- filterM (\p -> evalState p d) ps
+               case res of
+                 [] -> return Nothing
+                 _ -> return $ (Just $ head res)
 
 
-evalJob :: Person -> Int -> Bool
-evalJob p d = not $ elem d (dates p)
+-- evalJob :: Person -> Int -> Bool
+-- evalJob p d = not $ elem d (dates p)
 
-evalState :: Person -> Context Bool
-evalState p = do env <- ask
-                 let res = filter (\x -> fst x == Just p) env in
-                  return $ times p > (length $ res)
-
-
-                  -- && (cooldown p <= elemIndex  snd $ last res 
-                 
-
+evalState :: Person -> Int -> Context Bool
+evalState p d = do env <- ask 
+                   let res = filter (\x -> fst x == Just p) env in
+                     return $ times p > (length $ res) && (not $ elem d (dates p))
