@@ -43,4 +43,11 @@ evalState :: Person -> Int -> Plan Bool
 evalState p d = do env <- ask 
                    let res = filter (\x -> fst x == Just p) env in
                      return $ times p > (length $ res) &&
-                     (not $ elem d (dates p))
+                     (not $ elem d (dates p)) &&
+                     (cooldown p < lastAssigned p env)
+
+lastAssigned :: Person -> Env -> Int
+lastAssigned p env
+  | res <= [] = maxBound :: Int
+  | otherwise = length env - last res
+  where res = findIndices (\x -> fst x == Just p) env
