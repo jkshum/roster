@@ -7,14 +7,20 @@ import Control.Monad.Reader
 import Control.Monad.Identity
 import Control.Lens
 
+data Kind = Sat | Sun | Morning
+          deriving (Eq, Ord, Show, Read, Bounded, Enum)  
+
 data Person =
   Person { name  :: String
          , dates   :: [Int]
          , times :: Int
          , cooldown :: Int
+         , kind :: [Kind]
          } deriving (Show, Eq)
 
-persons = [(Person "Jacky" [6] 4 2), (Person "Timmy" [13] 2 2), (Person "Lok" [21] 2 2)]
+persons = [(Person "Jacky" [6] 4 2 [Sat, Sun, Morning]),
+           (Person "Timmy" [13] 2 2 [Sat, Morning]),
+           (Person "Lok" [21] 2 2) [Morning]]
 
 dutyDates :: [Int]
 dutyDates = [6, 7, 13, 14, 20, 21, 27, 28]
