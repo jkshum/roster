@@ -88,9 +88,22 @@ schedule :: [Person] -> [Job] -> Plan Env
 schedule _ [] = do env <- ask
                    return env
 schedule ps (j:js) = do env <- ask
-                        res <- (mapM (assign j ps) (jobForm j))
+                        res <- match j ps (jobForm j)
                         local (const $ env ++ [Schedule j res] ) $ schedule ps js
                         
+match :: Job -> [Person] -> [Role] -> Plan [(Role, Maybe Person)]
+match _ [] _ = do return []
+match _ _ [] = do return []
+match j ps (r:rs) = do res <- assign j ps r
+                       matched <- match j (consume (snd res) ps ) rs
+                       return $ res: matched
+
+consume :: Maybe Person -> [Person] -> [Person]
+consume p ps
+  | ps == [] = []
+  | p == Nothing = ps             
+  | otherwise = delete (fromJust p) ps
+  
 assign :: Job -> [Person] -> Role -> Plan (Role, Maybe Person)
 assign j ps r = do
   found <- pick j $ filter (\x -> elem r (roles x)) ps
@@ -111,13 +124,22 @@ evalState p j = do env <- ask
 
 lastAssigned :: Person -> Env -> Int
 lastAssigned p env
-  | res <= [] = maxBound :: Int
+  | res == [] = maxBound :: Int
   | otherwise = length env - last res
   where res = findIndices (\x -> elem (Just p) ([snd sp | sp <- scheduledPersons x])) env
 
 
-main =
-  putStrLn $ show $ runIdentity $ runReaderT (schedule persons dutyDates) []
-
-
 roster = runIdentity $ runReaderT (schedule persons dutyDates) []
+
+display :: Schedule -> (Int, Kind, [(Role, String)])
+display (Schedule {scheduledJob = sj, scheduledPersons = sps}) =
+  (date sj, jobKind sj, [(fst sp, getName $ snd sp) | sp <- sps])
+
+getName :: Maybe Person -> String
+getName p
+  | p == Nothing = ""
+  | otherwise = name $ fromJust p
+
+main =
+  putStrLn $ unlines $ map ( show . display) $ runIdentity $ runReaderT (schedule persons dutyDates) []
+
