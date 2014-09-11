@@ -113,10 +113,10 @@ match tj ps (r:rs) = do res <- assign tj ps r
   
 assign :: (Team, Job) -> [Person] -> Role -> Plan (Role, Maybe Person)
 assign (t, j) ps r = do found <- pick j $ filter (\x -> elem x $ teamMembers t) ps 
-                        case found of
-                          Nothing -> do found' <- pick j $ filter (\x -> elem r (roles x)) ps
-                                        return (r, found')
-                          _ -> return (r, found)
+                        if found == Nothing
+                           then do found' <- pick j $ filter (\x -> elem r (roles x)) ps
+                                   return (r, found')
+                           else return (r, found)
      
 pick :: Job -> [Person] -> Plan (Maybe Person)
 pick j ps = do res <- filterM (\p -> evalState p j) ps
@@ -126,16 +126,18 @@ pick j ps = do res <- filterM (\p -> evalState p j) ps
 
 evalState :: Person -> Job -> Plan Bool
 evalState p j = do env <- ask 
-                   let res = filter (\x -> elem (Just p) ([snd sp | sp <- scheduledPersons x])) env in
-                     return $ times p > (length res) &&
+                   return $ times p > countPersonByRole p env &&
                      (not $ elem (date j) (blockedDates p)) &&
                      (cooldown p < lastAssigned p env)
+
+countPersonByRole :: Person -> Env -> Int
+countPersonByRole p env = length $ filter (\x -> elem (Just p) [snd sp | sp <- scheduledPersons x]) env
 
 lastAssigned :: Person -> Env -> Int
 lastAssigned p env
   | res == [] = maxBound :: Int
   | otherwise = length env - last res
-  where res = findIndices (\x -> elem (Just p) ([snd sp | sp <- scheduledPersons x])) env
+  where res = findIndices (\x -> elem (Just p) [snd sp | sp <- scheduledPersons x]) env
 
 
 roster = runIdentity $ runReaderT (schedule persons $ assignTeam teams duties) []
