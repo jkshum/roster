@@ -20,33 +20,88 @@ data Person =
          -- , kinds :: [(Role, [Kind])]
          -- , roles :: [Role]
          -- , properties :: [Property (String)]
-         , props :: [Prop]
+         , personProps :: [Prop]
          } deriving (Show, Eq)
 
 data Prop = Var String Val
           deriving (Show, Eq)
 
-data Val = IntVal  [Prop]
-           | StringVal String [Prop]
-           | IntList [Int] [Prop]
-           | StringList [String] [Prop]
-           deriving (Show, Eq)
+data Val = IntVal Int 
+         | StringVal String
+         | IntListNode [(Int, Prop)]
+         | IntList [Int]
+         | StringListNode [(String, Prop)]
+         | StringList [String]
+         deriving (Show, Eq)
 
-jacky = Person "Jacky" [Var "blockedDates" $ IntList [6,13] [],
-                        Var "role" $ StringVal "Leader" [Var "kind" $ StringList  ["Sat", "Sun", "Morning"] []]
-                       ]
+data Op = In | Eq | Count
 
-getValue :: String -> [Prop] -> [Int]
+type Env  =  [Schedule]                      
+
+data Rule = JobRes Op String Job String Person
+          | ResSch Op Person Env
+             
+data Job =
+  Job { jobProps :: [Prop]
+      } deriving (Show, Eq)
+
+data Schedule =
+  Schedule { job :: Job
+           , res :: Person
+           } deriving (Show, Eq)
+
+
+resource = [ Person "Jacky" [ Var "blockedDates" $ IntList [6]
+                             , Var "role" $ StringListNode
+                               [ ("Leader",  Var "kind" $ StringList  ["Sat", "Sun", "Morning"])
+                               , ("Vocal",  Var "kind" $ StringList  ["Sat"]) 
+                               ]
+                             ]
+             ,Person "Timmy" [ Var "blockedDates" $ IntList [13]
+                             , Var "role" $ StringListNode
+                               [ ("Leader",  Var "kind" $ StringList  ["Sat", "Sun", "Morning"])
+                               , ("Vocal",  Var "kind" $ StringList  ["Sat"]) 
+                               ]
+                             ]
+             ]
+
+commonProps = [ Var "date" $ IntVal 13
+              , Var "kind" $ StringVal "Sat"]
+              
+jobs = [ Job {jobProps = [Var "role" $ StringVal "Leader"] ++ commonProps}
+          , Job {jobProps = [Var "role" $ StringVal "Vocal"] ++ commonProps} 
+          , Job {jobProps = [Var "role" $ StringVal "Vocal"] ++ commonProps} 
+          , Job {jobProps = [Var "role" $ StringVal "Vocal"] ++ commonProps} 
+          , Job {jobProps = [Var "role" $ StringVal "Vocal"] ++ commonProps} 
+          ]
+
+schedules = Schedule {}
+r1 = JobRes In "date" ( jobs !! 0)  "blockedDates" (resource !! 0)
+r2 = ResSch Count (resource !! 0)
+
+evalRule :: Rule -> Bool
+evalRule (JobRes o sj j sr r) = eval o (fromJust $ getValue sj $ jobProps j)
+                                (fromJust $ getValue sr $ personProps r)
+
+
+evalEnv :: Op -> Person -> Env -> Int
+evalEnv Count p e = length . filter (\x -> res x == p) e
+
+getValue :: String -> [Prop] -> Maybe Val
 getValue s ps = let res  = find (\ (Var k v) -> k == s) ps
                 in case res of
-                  Nothing -> []
-                  Just (Var k (IntList v [])) ->  v
+                  Nothing -> Nothing
+                  Just (Var k v) ->  Just v
 
-                
+eval :: Op -> Val -> Val -> Bool
+eval In (IntVal x )  (IntList y ) = elem x y;
+
+
+-- evalRule :: Job -> Person -> Bool
+-- evalRule ::
+-- schedule :: [Job] -> [Person] -> [Schedule]
+-- schedule j:js ps = 
   
-  
-                    
-                      
 -- persons = [Person "Jacky" [6] 4 2 [(Leader, [Sat, Sun, Morning]), (Vocal, [Sat])] [Leader, Vocal],
 --            Person "Timmy" [13] 2 2 [(Leader, [Sat, Sun, Morning]), (Vocal, [Sat])] [Leader, Vocal],
 --            Person "Lok" [21] 2 2 [(Leader, [Sat, Sun, Morning]), (Vocal, [Sat])] [Leader],
