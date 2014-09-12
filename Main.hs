@@ -26,7 +26,7 @@ data Person =
 data Prop = Var String Val
           deriving (Show, Eq)
 
-data Val = IntVal Int [Prop]
+data Val = IntVal  [Prop]
            | StringVal String [Prop]
            | IntList [Int] [Prop]
            | StringList [String] [Prop]
@@ -36,8 +36,16 @@ jacky = Person "Jacky" [Var "blockedDates" $ IntList [6,13] [],
                         Var "role" $ StringVal "Leader" [Var "kind" $ StringList  ["Sat", "Sun", "Morning"] []]
                        ]
 
-getValue :: String -> Prop -> [Int]
-getValue s (Var k (IntList v [])) = v
+getValue :: String -> [Prop] -> [Int]
+getValue s ps = let res  = find (\ (Var k v) -> k == s) ps
+                in case res of
+                  Nothing -> []
+                  Just (Var k (IntList v [])) ->  v
+
+                
+  
+  
+                    
                       
 -- persons = [Person "Jacky" [6] 4 2 [(Leader, [Sat, Sun, Morning]), (Vocal, [Sat])] [Leader, Vocal],
 --            Person "Timmy" [13] 2 2 [(Leader, [Sat, Sun, Morning]), (Vocal, [Sat])] [Leader, Vocal],
