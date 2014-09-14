@@ -14,11 +14,11 @@ import Control.Monad.Identity
 
 type Key = String
 type Col = Int
-type Row = (Entity, Entity)
+-- type Row = (Entity, Entity)
 
 -- data Expr = Apply Op Expr Expr
 --           | Foreach Expr [Expr]
---           | Select Op Int Expr
+--           | Select Oyffp Int Expr
 --           | Query Op Expr
 --           | Where Op Expr Key Col Expr
 --           | Predicate Op Expr Expr
@@ -29,12 +29,20 @@ type Row = (Entity, Entity)
 --           | None 
 --           deriving (Show, Eq)
 
-data Entity = Prop Key Val
-            | Props Key [Val]
-            | Group Key [Entity]
+data Exp = Select Key Entity
+
+
+data Predicate = Eq Exp Exp
+               | In Exp Exp
+
+type Entity = [Prop]
+data Prop = Prop Key Val
+            | Group Key Entity
             deriving (Show, Eq)
 
-data Val = Int | String  
+data Val = IntVal Int
+         | StringVal String
+         | BoolVal Bool
          deriving (Show, Eq)
 
                   
@@ -62,17 +70,59 @@ data Val = Int | String
 --            , res :: Person
 --            } deriving (Show, Eq)
 
+jacky =
+  [ Prop "name" $ StringVal "Jacky"
+  , Prop "id" $ StringVal "1"
+  , Prop "date" $ IntVal 6
+  , Prop "date" $ IntVal 13
+  , Prop "availability" $ IntVal 1
+  , Group "role" [ Prop "type" $ StringVal "Leader"
+                 , Prop "kind" $ StringVal "Sun"
+                 , Prop "kind" $ StringVal "Morning"]
+  , Group "role" [ Prop "type" $ StringVal "Vocal"
+                 , Prop "kind" $ StringVal "Sun"
+                 , Prop "kind" $ StringVal "Morning"]
+  ]
 
--- resource =
---   [ Prop "name" "Jacky"
---   , Prop "id" "1"
---   , Prop "availability" 1
---   , Props "blockedDates" [6]
---   , Group "role" [ Props "leader" ["Sat", "Sun", "Morning"]
---                  , Props "local" ["Sat"]              
---                  ]
---   ]
-test = Prop "name" "test"
+job =
+  [ Prop "date" $ IntVal 6
+  ]
+  
+e1 = Eq (Select "name" jacky) (Select "name" jacky)
+e2 = In (Select "date" job) (Select "date" jacky)
+
+match :: Key -> Prop -> Bool
+match key (Prop k v) = key == k
+match key (Group k e) = key == k
+
+evalExp :: Exp -> Entity
+evalExp (Select key props) = filter (\p-> match key p) props
+
+evalPre :: Predicate -> Bool
+evalPre (Eq e1 e2) = evalPre' (==) e1 e2
+evalPre (In e1 e2) = and [elem v1 [v2 | (Prop k2 v2) <- evalExp e2]
+                     | (Prop k1 v1) <- evalExp e1]
+
+evalPre' :: (Val -> Val -> Bool) -> Exp -> Exp -> Bool
+evalPre' fn e1 e2 = and [fn v1 v2 | (Prop k1 v1) <- evalExp e1
+                                  , (Prop k2 v2) <- evalExp e2]
+
+-- evalPre (Eq (Prop k1 v1) (Prop k2 v2)) = v1 == v2
+-- resource = [e1, e2]
+
+-- eq "name" e1 "name" e2
+
+-- evalExpr (Predicate o e1 e2) = BoolVal $ eval o (evalExpr e1) (evalExpr e2)
+-- evalExpr (Extract k e) = fromJust $ getValue k e
+
+-- getValue :: String -> Prop -> 
+-- getValue s ps = let res  = filter (\(k v) -> k == s) ps
+                       
+                       
+                       
+
+
+
 -- commonProps = [ Var "date" $ IntVal 6
 --               , Var "kind" $ StringVal "Sat"]
               
@@ -86,7 +136,7 @@ test = Prop "name" "test"
 -- schedules = Schedule {}
 
 -- schs = View [(jobs !! 0, resource !! 0)]
--- q1 = Predicate In (Extract "date" ( jobs !! 0)) (Extract "blockedDates" (resource !! 0))
+
 
 -- r2 = Where Eq schs "Id" 1 (Extract "Id" (resource !! 0))
 -- r3 = Query Count r2
