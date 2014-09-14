@@ -16,38 +16,42 @@ type Key = String
 type Col = Int
 type Row = (Entity, Entity)
 
-data Expr = Apply Op Expr Expr
-          | Foreach Expr [Expr]
-          | Select Op Int Expr
-          | Query Op Expr
-          | Where Op Expr Key Col Expr
-          | Predicate Op Expr Expr
-          | Extract Key Entity
-          | View [Row]
-          | Group [Expr]
-          | This
-          | None 
-          deriving (Show, Eq)
+-- data Expr = Apply Op Expr Expr
+--           | Foreach Expr [Expr]
+--           | Select Op Int Expr
+--           | Query Op Expr
+--           | Where Op Expr Key Col Expr
+--           | Predicate Op Expr Expr
+--           | Extract Key Entity
+--           | View [Row]
+--           | Group [Expr]
+--           | This
+--           | None 
+--           deriving (Show, Eq)
 
-data Entity = Props [Prop]
+data Entity = Prop Key Val
+            | Props Key [Val]
+            | Group Key [Entity]
             deriving (Show, Eq)
 
-data Prop = Var String Val
-          deriving (Show, Eq)
-
-data Val = IntVal Int 
-         | StringVal String
-         | IntListNode [(Int, Prop)]
-         | IntList [Int]
-         | StringListNode [(String, Prop)]
-         | StringList [String]
-         | ExprVal Expr
-         | ExprList [Expr]  
-         | BoolVal Bool
+data Val = Int | String  
          deriving (Show, Eq)
 
-data Op = In | Eq | Count | GreaterEq | Groupby | Index | Top
-        deriving (Show, Eq)
+                  
+-- data Prop  = VarInt String Int
+--            | VarString String String
+--            | VarIntList String [Int]
+--            | VarStringList String [String]
+--            | VarEntity String Entity
+--           deriving (Show, Eq)
+
+-- data Val = IntVal Int 
+--          | StringVal String
+--          | BoolVal Bool
+--          deriving (Show, Eq)
+
+-- data Op = In | Eq | Count | GreaterEq | Groupby | Index | Top
+--         deriving (Show, Eq)
 
 -- type Row  =  [Schedule]                      
 
@@ -59,115 +63,104 @@ data Op = In | Eq | Count | GreaterEq | Groupby | Index | Top
 --            } deriving (Show, Eq)
 
 
-resource = [Props [ Var "Name" $ StringVal "Jacky"
-                  , Var "Id" $ StringVal "1"
-                  , Var "availability" $ IntVal 1
-                  , Var "blockedDates" $ IntList [6]
-                  , Var "role" $ StringListNode
-                     [ ("Leader",  Var "kind" $ StringList  ["Sat", "Sun", "Morning"])
-                     , ("Vocal",  Var "kind" $ StringList  ["Sat"]) 
-                     ]
-                   ],
-            Props [ Var "Name" $ StringVal "Timmy"
-                  , Var "Id" $ StringVal "2"
-                  , Var "availability" $ IntVal 3
-                  , Var "blockedDates" $ IntList [13]
-                  , Var "role" $ StringListNode
-                     [ ("Leader",  Var "kind" $ StringList  ["Sat", "Sun", "Morning"])
-                     , ("Vocal",  Var "kind" $ StringList  ["Sat"]) 
-                     ]
-                   ]
-           ]
-
-commonProps = [ Var "date" $ IntVal 6
-              , Var "kind" $ StringVal "Sat"]
+-- resource =
+--   [ Prop "name" "Jacky"
+--   , Prop "id" "1"
+--   , Prop "availability" 1
+--   , Props "blockedDates" [6]
+--   , Group "role" [ Props "leader" ["Sat", "Sun", "Morning"]
+--                  , Props "local" ["Sat"]              
+--                  ]
+--   ]
+test = Prop "name" "test"
+-- commonProps = [ Var "date" $ IntVal 6
+--               , Var "kind" $ StringVal "Sat"]
               
-jobs = [ Props $ [Var "role" $ StringVal "Leader"] ++ commonProps
-       , Props $ [Var "role" $ StringVal "Vocal"] ++ commonProps 
-       , Props $ [Var "role" $ StringVal "Vocal"] ++ commonProps 
-       , Props $ [Var "role" $ StringVal "Vocal"] ++ commonProps 
-       , Props $ [Var "role" $ StringVal "Vocal"] ++ commonProps 
-       ]
+-- jobs = [ Props $ [Var "role" $ StringVal "Leader"] ++ commonProps
+--        , Props $ [Var "role" $ StringVal "Vocal"] ++ commonProps 
+--        , Props $ [Var "role" $ StringVal "Vocal"] ++ commonProps 
+--        , Props $ [Var "role" $ StringVal "Vocal"] ++ commonProps 
+--        , Props $ [Var "role" $ StringVal "Vocal"] ++ commonProps 
+--        ]
 
 -- schedules = Schedule {}
 
-schs = View [(jobs !! 0, resource !! 0)]
-q1 = Predicate In (Extract "date" ( jobs !! 0)) (Extract "blockedDates" (resource !! 0))
+-- schs = View [(jobs !! 0, resource !! 0)]
+-- q1 = Predicate In (Extract "date" ( jobs !! 0)) (Extract "blockedDates" (resource !! 0))
 
-r2 = Where Eq schs "Id" 1 (Extract "Id" (resource !! 0))
-r3 = Query Count r2
-r4 = Apply GreaterEq (Extract "availability" (resource !! 0)) r3
+-- r2 = Where Eq schs "Id" 1 (Extract "Id" (resource !! 0))
+-- r3 = Query Count r2
+-- r4 = Apply GreaterEq (Extract "availability" (resource !! 0)) r3
 
-s1 = Where Groupby schs "date" 1 None --[[Row]]
-s2 = Where Eq s1 "date" 0  (Extract "Id" (resource !! 0))
-s3 = Foreach Select Top 1 This s1
--- s5 = Apply Index s2 s4
+-- s1 = Where Groupby schs "date" 1 None --[[Row]]
+-- s2 = Where Eq s1 "date" 0  (Extract "Id" (resource !! 0))
+-- s3 = Foreach Select Top 1 This s1
+-- -- s5 = Apply Index s2 s4
 
--- s6 = Apply GreaterEq (Extract "cooldown" (resource !! 0)) Query Count s4
+-- -- s6 = Apply GreaterEq (Extract "cooldown" (resource !! 0)) Query Count s4
 
-getEntity :: Col -> Row -> Entity
-getEntity c r
-  | c == 0 = fst r
-  | c == 1 = snd r
+-- getEntity :: Col -> Row -> Entity
+-- getEntity c r
+--   | c == 0 = fst r
+--   | c == 1 = snd r
 
-evalExpr :: Expr -> Val
+-- evalExpr :: Expr -> Val
 
-evalExpr (Foreach e es) = map (\r -> evalExpr e) es
+-- evalExpr (Foreach e es) = map (\r -> evalExpr e r) es
 
-evalExpr (Select o i (View rows))
-  | o == Top = ExprVal $ View $ take i rows
+-- evalExpr (Select o i (View rows))
+--   | o == Top = ExprVal $ View $ take i rows
                
-evalExpr (Apply o e1 e2)
-  | o == GreaterEq = let IntVal i1 = evalExpr e1
-                         IntVal i2 = evalExpr e2
+-- evalExpr (Apply o e1 e2)
+--   | o == GreaterEq = let IntVal i1 = evalExpr e1
+--                          IntVal i2 = evalExpr e2
 
-                     in BoolVal $ i1 >= i2
-  | o == Index = let ExprVal (View rs1) = evalExpr e1
-                     ExprVal (View rs2) = evalExpr e2
-                     in IntList $
-                        map (\r1->
-                              let indices = elemIndices r1 rs2
-                              in if length indices > 0
-                                    then head indices
-                                    else -1 
-                            ) rs1
+--                      in BoolVal $ i1 >= i2
+--   | o == Index = let ExprVal (View rs1) = evalExpr e1
+--                      ExprVal (View rs2) = evalExpr e2
+--                      in IntList $
+--                         map (\r1->
+--                               let indices = elemIndices r1 rs2
+--                               in if length indices > 0
+--                                     then head indices
+--                                     else -1 
+--                             ) rs1
                      
-evalExpr (Query o e)
-  | o == Count = let (ExprVal (View res)) = evalExpr e in
-                     IntVal $ length res
+-- evalExpr (Query o e)
+--   | o == Count = let (ExprVal (View res)) = evalExpr e in
+--                      IntVal $ length res
 
-evalExpr (Where o (View rows) k1 c e2)
-  | o == Groupby = ExprList $
-                   [View $ l | l <- groupBy
-                   (\x y -> evalExpr (Extract k1 $ getEntity c x) ==
-                            evalExpr (Extract k1 $ getEntity c y)) rows]
+-- evalExpr (Where o (View rows) k1 c e2)
+--   | o == Groupby = ExprList $
+--                    [View $ l | l <- groupBy
+--                    (\x y -> evalExpr (Extract k1 $ getEntity c x) ==
+--                             evalExpr (Extract k1 $ getEntity c y)) rows]
                    
-  | otherwise =  ExprVal $ View $ filter
-                 (\r ->
-                   let BoolVal res =
-                         evalExpr $ Predicate o (Extract k1 (getEntity c r)) e2
-                   in res
-                 ) rows
+--   | otherwise =  ExprVal $ View $ filter
+--                  (\r ->
+--                    let BoolVal res =
+--                          evalExpr $ Predicate o (Extract k1 (getEntity c r)) e2
+--                    in res
+--                  ) rows
 
-evalExpr (Predicate o e1 e2) = BoolVal $ eval o (evalExpr e1) (evalExpr e2)
-evalExpr (Extract k e) = fromJust $ getValue k e
+-- evalExpr (Predicate o e1 e2) = BoolVal $ eval o (evalExpr e1) (evalExpr e2)
+-- evalExpr (Extract k e) = fromJust $ getValue k e
 
-getValue :: String -> Entity -> Maybe Val
-getValue s (Props ps) = let res  = find (\ (Var k v) -> k == s) ps
-                        in case res of
-                        Nothing -> Nothing
-                        Just (Var k v) ->  Just v
+-- getValue :: String -> Entity -> Maybe Val
+-- getValue s (Props ps) = let res  = find (\ (Var k v) -> k == s) ps
+--                         in case res of
+--                         Nothing -> Nothing
+--                         Just (Var k v) ->  Just v
 
-eval :: Op -> Val -> Val -> Bool
-eval In (IntVal x )  (IntList y ) = elem x y;
-eval Eq (IntVal x )  (IntVal y ) = x == y;
-eval Eq (StringVal x )  (StringVal y ) = x == y;
+-- eval :: Op -> Val -> Val -> Bool
+-- eval In (IntVal x )  (IntList y ) = elem x y;
+-- eval Eq (IntVal x )  (IntVal y ) = x == y;
+-- eval Eq (StringVal x )  (StringVal y ) = x == y;
 
 -- evalRule :: Job -> Person -> Bool
 -- evalRule ::
 -- schedule :: [Job] -> [Person] -> [Schedule]
 -- schedule j:js ps = 
-
 
          -- , blockedDates   :: [Int]
          -- , times :: Int
