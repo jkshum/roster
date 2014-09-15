@@ -30,12 +30,16 @@ type Col = Int
 --           deriving (Show, Eq)
 
 data Exp = Select Key Entity
-
-
+         deriving (Show, Eq)
+                  
 data Predicate = Eq Exp Exp
                | In Exp Exp
-
-type Entity = [Prop]
+               deriving (Show, Eq)
+                        
+data Entity = Result [Prop]
+            | Sub Exp
+            deriving (Show, Eq)
+              
 data Prop = Prop Key Val
             | Group Key Entity
             deriving (Show, Eq)
@@ -76,36 +80,45 @@ jacky =
   , Prop "date" $ IntVal 6
   , Prop "date" $ IntVal 13
   , Prop "availability" $ IntVal 1
-  , Group "role" [ Prop "type" $ StringVal "Leader"
+  , Group "role" $ Result [ Prop "type" $ StringVal "Leader"
                  , Prop "kind" $ StringVal "Sun"
                  , Prop "kind" $ StringVal "Morning"]
-  , Group "role" [ Prop "type" $ StringVal "Vocal"
+  , Group "role" $ Result [ Prop "type" $ StringVal "Vocal"
                  , Prop "kind" $ StringVal "Sun"
                  , Prop "kind" $ StringVal "Morning"]
   ]
 
 job =
   [ Prop "date" $ IntVal 6
+  , Prop "kind" $ StringVal "Moring"
+  ]
+
+schedule =
+  [ Group "job" $ Result job
+  , Group "resource" $  Result jacky
   ]
   
-e1 = Eq (Select "name" jacky) (Select "name" jacky)
-e2 = In (Select "date" job) (Select "date" jacky)
+-- e1 = Eq (Select "name" jacky) (Select "name" jacky)
+-- e2 = In (Select "date" job) (Select "date" jacky)
+e3 = In (Select "kind" $ Result job) (Select "kind" $ Sub (Select "role" $ Result jacky))
 
 match :: Key -> Prop -> Bool
 match key (Prop k v) = key == k
 match key (Group k e) = key == k
 
 evalExp :: Exp -> Entity
-evalExp (Select key props) = filter (\p-> match key p) props
+evalExp (Select key (Result props)) = Result $ filter (\p-> match key p) props
 
 evalPre :: Predicate -> Bool
-evalPre (Eq e1 e2) = evalPre' (==) e1 e2
-evalPre (In e1 e2) = and [elem v1 [v2 | (Prop k2 v2) <- evalExp e2]
-                     | (Prop k1 v1) <- evalExp e1]
+-- evalPre (Eq e1 e2) = evalPre' (==) e1 e2
+evalPre (In e1 e2) = and [elem v1 [v2 | (Prop k2 v2) <- res2]
+                     | (Prop k1 v1) <- res1]
+                     where (Result res2) = evalExp e2
+                           (Result res1) = evalExp e1
 
-evalPre' :: (Val -> Val -> Bool) -> Exp -> Exp -> Bool
-evalPre' fn e1 e2 = and [fn v1 v2 | (Prop k1 v1) <- evalExp e1
-                                  , (Prop k2 v2) <- evalExp e2]
+-- evalPre' :: (Val -> Val -> Bool) -> Exp -> Exp -> Bool
+-- evalPre' fn e1 e2 = and [fn v1 v2 | (Prop k1 v1) <- evalExp e1
+--                                   , (Prop k2 v2) <- evalExp e2]
 
 -- evalPre (Eq (Prop k1 v1) (Prop k2 v2)) = v1 == v2
 -- resource = [e1, e2]
