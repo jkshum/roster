@@ -12,8 +12,8 @@ import Control.Monad.Identity
 -- data Role = Leader | Vocal
 --           deriving (Eq, Ord, Show, Read, Bounded, Enum)  
 
-type Key = String
-type Col = Int
+
+-- type Col = Int
 -- type Row = (Entity, Entity)
 
 -- data Expr = Apply Op Expr Expr
@@ -28,97 +28,143 @@ type Col = Int
 --           | This
 --           | None 
 --           deriving (Show, Eq)
+type Key = String
 
-data Exp = Select Key Entity
+data Exp = Get [Key] Val
          deriving (Show, Eq)
-                  
+
+data Forall = Top Int [[Val]]
+            | Select [[Val]]
+              
+data Select = Filter [Key] Val
+            | Apply Select [Val]
+            deriving (Show, Eq)
+
+data Aggr = Count [Val]
+
+data Nest = Group [Key] [Val]
+          
+
+
 data Predicate = Eq Exp Exp
                | In Exp Exp
                deriving (Show, Eq)
                         
-data Entity = Result [Prop]
-            | Sub Exp
-            deriving (Show, Eq)
-              
-data Prop = Prop Key Val
-            | Group Key Entity
+-- data Aggregate = Count Exp
+--                deriving (Show, Eq)
+                        
+data Entity = Prop Key Val
             deriving (Show, Eq)
 
 data Val = IntVal Int
          | StringVal String
          | BoolVal Bool
+         | StringListVal [String]
+         | IntListVal [Int]    
+         | ObjectVal [Entity]
+         | None
          deriving (Show, Eq)
-
                   
--- data Prop  = VarInt String Int
---            | VarString String String
---            | VarIntList String [Int]
---            | VarStringList String [String]
---            | VarEntity String Entity
---           deriving (Show, Eq)
-
--- data Val = IntVal Int 
---          | StringVal String
---          | BoolVal Bool
---          deriving (Show, Eq)
-
--- data Op = In | Eq | Count | GreaterEq | Groupby | Index | Top
---         deriving (Show, Eq)
-
--- type Row  =  [Schedule]                      
-
-             
-
--- data Schedule =
---   Schedule { job :: Job
---            , res :: Person
---            } deriving (Show, Eq)
-
-jacky =
+jacky = ObjectVal
   [ Prop "name" $ StringVal "Jacky"
   , Prop "id" $ StringVal "1"
   , Prop "date" $ IntVal 6
   , Prop "date" $ IntVal 13
   , Prop "availability" $ IntVal 1
-  , Group "role" $ Result [ Prop "type" $ StringVal "Leader"
-                 , Prop "kind" $ StringVal "Sun"
-                 , Prop "kind" $ StringVal "Morning"]
-  , Group "role" $ Result [ Prop "type" $ StringVal "Vocal"
-                 , Prop "kind" $ StringVal "Sun"
-                 , Prop "kind" $ StringVal "Morning"]
+  , Prop "role" $ ObjectVal [ Prop "type" $ StringVal "Leader"
+                            , Prop "kinds" $ StringListVal ["Sun", "Morning"]]
+  , Prop "role" $ ObjectVal [ Prop "type" $ StringVal "Vocal"
+                            , Prop "kind" $ StringListVal ["Sun", "Morning"]]
   ]
 
-job =
-  [ Prop "date" $ IntVal 6
-  , Prop "kind" $ StringVal "Moring"
-  ]
-
-schedule =
-  [ Group "job" $ Result job
-  , Group "resource" $  Result jacky
+timmy = ObjectVal
+  [ Prop "name" $ StringVal "Timmy"
+  , Prop "id" $ StringVal "1"
+  , Prop "date" $ IntVal 6
+  , Prop "date" $ IntVal 13
+  , Prop "availability" $ IntVal 1
+  , Prop "role" $ ObjectVal [ Prop "type" $ StringVal "Leader"
+                            , Prop "kinds" $ StringListVal ["Sun", "Morning"]]
+  , Prop "role" $ ObjectVal [ Prop "type" $ StringVal "Vocal"
+                            , Prop "kind" $ StringListVal ["Sun", "Morning"]]
   ]
   
--- e1 = Eq (Select "name" jacky) (Select "name" jacky)
--- e2 = In (Select "date" job) (Select "date" jacky)
-e3 = In (Select "kind" $ Result job) (Select "kind" $ Sub (Select "role" $ Result jacky))
+resources :: [Val]
+resources = [jacky, timmy]
 
-match :: Key -> Prop -> Bool
-match key (Prop k v) = key == k
-match key (Group k e) = key == k
+job1 = ObjectVal
+  [ Prop "date" $ IntVal 6
+  , Prop "kind" $ StringVal "Morning"
+  , Prop "role" $ StringVal "Leader"
+  ]
 
-evalExp :: Exp -> Entity
-evalExp (Select key (Result props)) = Result $ filter (\p-> match key p) props
+job2 = ObjectVal
+  [ Prop "date" $ IntVal 6
+  , Prop "kind" $ StringVal "Morning"
+  , Prop "role" $ StringVal "Leader"
+  ]
+  
+job3 = ObjectVal
+  [ Prop "date" $ IntVal 13
+  , Prop "kind" $ StringVal "Morning"
+  , Prop "role" $ StringVal "Leader"
+  ]
 
-evalPre :: Predicate -> Bool
--- evalPre (Eq e1 e2) = evalPre' (==) e1 e2
-evalPre (In e1 e2) = and [elem v1 [v2 | (Prop k2 v2) <- res2]
-                     | (Prop k1 v1) <- res1]
-                     where (Result res2) = evalExp e2
-                           (Result res1) = evalExp e1
+jobs :: [Val]
+jobs = [job1, job2, job3]
 
--- evalPre' :: (Val -> Val -> Bool) -> Exp -> Exp -> Bool
--- evalPre' fn e1 e2 = and [fn v1 v2 | (Prop k1 v1) <- evalExp e1
---                                   , (Prop k2 v2) <- evalExp e2]
+-- schedule =
+--   [ Object "job" $ job
+--   , Object "resource" $  jacky
+--   ]
+
+-- roster = [ Object "schedule" $ schedule
+--          , Object "schedule" $ schedule]  
+  
+e1 = Get ["role", "kinds"] jacky
+e2 = Apply Filter ["role", "type"] (StringVal "Leader") resources
+e3 = Group ["date"] jobs
+
+evalExp :: Exp -> Val
+evalExp (Get ks (ObjectVal es)) = getVal ks es
+
+evalSelect :: Select -> [Val]
+evalSelect (Filter ks v vs) = filterByVal ks v vs 
+
+filterByVal :: [Key] -> Val -> [Val] -> [Val]
+filterByVal ks v vs = filter (\(ObjectVal xs) -> getVal ks xs == v) vs
+
+evalAggr :: Aggr -> Val
+evalAggr (Count xs) = IntVal $ length xs
+
+evalNest :: Nest -> [[Val]]
+evalNest (Group ks vs) = groupBy (\(ObjectVal xs) (ObjectVal ys) -> 
+                                   getVal ks xs == getVal ks ys) vs
+
+
+forall :: Forall -> [[a]] -> [a]
+forall  = 
+
+  
+getVal :: [Key] -> [Entity] -> Val
+getVal (key:ks) es =
+  let found = find (\(Prop k v) -> key == k) es
+  in if found == Nothing then None
+     else let (Just (Prop k v)) = found
+          in case v of
+              ObjectVal obj -> getVal ks obj 
+              otherwise -> v
+        
+-- evalPre :: Predicate -> Bool
+-- evalPre (Eq e1 e2) = and [v1 == v2 | (Prop k1 v1) <- res1
+--                                    , (Prop k2 v2) <- res2]
+--                      where ( res2) = evalExp e2
+--                            ( res1) = evalExp e1
+
+-- evalPre (In e1 e2) = and [elem v1 [v2 | (Prop k2 v2) <- res2]
+--                      | (Prop k1 v1) <- res1]
+--                      where ( res2) = evalExp e2
+--                            ( res1) = evalExp e1
 
 -- evalPre (Eq (Prop k1 v1) (Prop k2 v2)) = v1 == v2
 -- resource = [e1, e2]
@@ -155,9 +201,9 @@ evalPre (In e1 e2) = and [elem v1 [v2 | (Prop k2 v2) <- res2]
 -- r3 = Query Count r2
 -- r4 = Apply GreaterEq (Extract "availability" (resource !! 0)) r3
 
--- s1 = Where Groupby schs "date" 1 None --[[Row]]
+-- s1 = Where Objectby schs "date" 1 None --[[Row]]
 -- s2 = Where Eq s1 "date" 0  (Extract "Id" (resource !! 0))
--- s3 = Foreach Select Top 1 This s1
+-- s3 = Foreach Get Top 1 This s1
 -- -- s5 = Apply Index s2 s4
 
 -- -- s6 = Apply GreaterEq (Extract "cooldown" (resource !! 0)) Query Count s4
@@ -171,7 +217,7 @@ evalPre (In e1 e2) = and [elem v1 [v2 | (Prop k2 v2) <- res2]
 
 -- evalExpr (Foreach e es) = map (\r -> evalExpr e r) es
 
--- evalExpr (Select o i (View rows))
+-- evalExpr (Get o i (View rows))
 --   | o == Top = ExprVal $ View $ take i rows
                
 -- evalExpr (Apply o e1 e2)
@@ -194,7 +240,7 @@ evalPre (In e1 e2) = and [elem v1 [v2 | (Prop k2 v2) <- res2]
 --                      IntVal $ length res
 
 -- evalExpr (Where o (View rows) k1 c e2)
---   | o == Groupby = ExprList $
+--   | o == Objectby = ExprList $
 --                    [View $ l | l <- groupBy
 --                    (\x y -> evalExpr (Extract k1 $ getEntity c x) ==
 --                             evalExpr (Extract k1 $ getEntity c y)) rows]
