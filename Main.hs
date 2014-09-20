@@ -6,154 +6,265 @@ import Data.Maybe
 import Control.Monad.Reader
 import Control.Monad.Identity
 
--- data Kind = Sat | Sun | Morning
---           deriving (Eq, Ord, Show, Read, Bounded, Enum)  
-
--- data Role = Leader | Vocal
---           deriving (Eq, Ord, Show, Read, Bounded, Enum)  
-
-
--- type Col = Int
--- type Row = (Entity, Entity)
-
--- data Expr = Apply Op Expr Expr
---           | Foreach Expr [Expr]
---           | Select Oyffp Int Expr
---           | Query Op Expr
---           | Where Op Expr Key Col Expr
---           | Predicate Op Expr Expr
---           | Extract Key Entity
---           | View [Row]
---           | Group [Expr]
---           | This
---           | None 
---           deriving (Show, Eq)
+data Context = Schedules | Job | Res
+             deriving (Show, Eq, Ord)
+                  
 type Key = String
 
-data Exp = Get [Key] Val
-         deriving (Show, Eq)
-
-data Forall = Top Int [[Val]]
-            | Select [[Val]]
-              
-data Select = Filter [Key] Val
-            | Apply Select [Val]
-            deriving (Show, Eq)
-
-data Aggr = Count [Val]
-
-data Nest = Group [Key] [Val]
-          
-
-
-data Predicate = Eq Exp Exp
-               | In Exp Exp
-               deriving (Show, Eq)
-                        
--- data Aggregate = Count Exp
---                deriving (Show, Eq)
+data Exp = Where [Key] Val Val
+         | Last Val
+         | Get Key Val
+         | Count Val
+         | GreaterEq Val Val
+         | Diff Val Val
+         deriving (Show, Eq, Ord)
                         
 data Entity = Prop Key Val
-            deriving (Show, Eq)
+            deriving (Show, Eq, Ord)
 
 data Val = IntVal Int
-         | StringVal String
          | BoolVal Bool
-         | StringListVal [String]
-         | IntListVal [Int]    
-         | ObjectVal [Entity]
+         | StringVal String
+         | ObjVal [Entity]
+         | ListVal [Val]
+         | ExpVal Exp
+         | ContextVal Context
          | None
-         deriving (Show, Eq)
+         deriving (Show, Eq, Ord)
                   
-jacky = ObjectVal
+jacky = ObjVal
   [ Prop "name" $ StringVal "Jacky"
   , Prop "id" $ StringVal "1"
   , Prop "date" $ IntVal 6
-  , Prop "date" $ IntVal 13
+  , Prop "cooldown" $ IntVal 2
   , Prop "availability" $ IntVal 1
-  , Prop "role" $ ObjectVal [ Prop "type" $ StringVal "Leader"
-                            , Prop "kinds" $ StringListVal ["Sun", "Morning"]]
-  , Prop "role" $ ObjectVal [ Prop "type" $ StringVal "Vocal"
-                            , Prop "kind" $ StringListVal ["Sun", "Morning"]]
+  , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
+                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                                             , StringVal "Morning"]
+                                    ]
+                           , ObjVal [ Prop "type" $ StringVal "Vocal"
+                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                                             , StringVal "Morning"]
+                                    ]
+                           ]
   ]
 
-timmy = ObjectVal
+timmy = ObjVal
   [ Prop "name" $ StringVal "Timmy"
   , Prop "id" $ StringVal "1"
   , Prop "date" $ IntVal 6
-  , Prop "date" $ IntVal 13
+  , Prop "cooldown" $ IntVal 2
   , Prop "availability" $ IntVal 1
-  , Prop "role" $ ObjectVal [ Prop "type" $ StringVal "Leader"
-                            , Prop "kinds" $ StringListVal ["Sun", "Morning"]]
-  , Prop "role" $ ObjectVal [ Prop "type" $ StringVal "Vocal"
-                            , Prop "kind" $ StringListVal ["Sun", "Morning"]]
+  , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
+                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                                             , StringVal "Morning"]
+                                    ]
+                           , ObjVal [ Prop "type" $ StringVal "Vocal"
+                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                                             , StringVal "Morning"]
+                                    ]
+                           ]
   ]
-  
+
+
+lok = ObjVal
+  [ Prop "name" $ StringVal "Lok"
+  , Prop "id" $ StringVal "1"
+  , Prop "date" $ IntVal 6
+  , Prop "cooldown" $ IntVal 2
+  , Prop "availability" $ IntVal 1
+  , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
+                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                                             , StringVal "Morning"]
+                                    ]
+                           , ObjVal [ Prop "type" $ StringVal "Vocal"
+                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                                             , StringVal "Morning"]
+                                    ]
+                           ]
+  ]
+
+
 resources :: [Val]
 resources = [jacky, timmy]
 
-job1 = ObjectVal
+job1 = ObjVal
   [ Prop "date" $ IntVal 6
-  , Prop "kind" $ StringVal "Morning"
-  , Prop "role" $ StringVal "Leader"
+  , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"]
   ]
 
-job2 = ObjectVal
-  [ Prop "date" $ IntVal 6
-  , Prop "kind" $ StringVal "Morning"
-  , Prop "role" $ StringVal "Leader"
-  ]
-  
-job3 = ObjectVal
+job2 = ObjVal
   [ Prop "date" $ IntVal 13
-  , Prop "kind" $ StringVal "Morning"
-  , Prop "role" $ StringVal "Leader"
+  , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"]
   ]
 
-jobs :: [Val]
-jobs = [job1, job2, job3]
+jobs = [job1, job2]
 
--- schedule =
---   [ Object "job" $ job
---   , Object "resource" $  jacky
---   ]
+schedules = 
+    [ ObjVal [ Prop "job" job1
+             , Prop "index" $ IntVal 0
+             , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
+                                              , Prop "index" $ IntVal 0
+                                              , Prop "res" jacky
+                                              ]
+                                     , ObjVal [ Prop "role" $ StringVal "Vocal"
+                                              , Prop "index" $ IntVal 1
+                                              , Prop "res" lok
+                                              ]
+                                     ]
+             ]
+    , ObjVal [ Prop "job" job2
+             , Prop "index" $ IntVal 1
+             , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
+                                              , Prop "index" $ IntVal 0
+                                              , Prop "res" timmy]
+                                     , ObjVal [ Prop "role" $ StringVal "Vocal"
+                                              , Prop "index" $ IntVal 1
+                                              , Prop "res" timmy]
+                                     ]
+             ]  
+    ]
 
--- roster = [ Object "schedule" $ schedule
---          , Object "schedule" $ schedule]  
+
+
+
+rule1 = GreaterEq
+         (ExpVal (Diff 
+                  (ExpVal $ Count $ ContextVal Schedules)
+                  (ExpVal (Get "index" (ExpVal $ Last $ ExpVal $
+                                        Where ["team", "res", "name"]
+                                        (StringVal "Jacky") (ContextVal Schedules)
+                                       )
+                          )
+                  )
+                 )
+         )
+         (ExpVal (Get "cooldown" $ ContextVal Res))
+
+
+rules = [rule1]
+
+-- schedule rules [] (ListVal jobs) (ListVal resources)
+genTeam :: Int -> Val -> Val -> Val
+genTeam i ro re = ObjVal [ Prop "role" ro
+                         , Prop "index" $ IntVal i
+                         , Prop "res" re]
+                    
+schedule :: [Exp] -> [Val] -> [Val] -> [Val] -> [Val]
+schedule es schs (j:js) re = let (ListVal ros) = get "roles" j
+                             in [ genTeam i ro $ match es schs j re
+                                | i <- [0.. (length ros)]
+                                , ro <- ros]
+
+match :: [Exp] -> [Val] -> Val -> [Val] -> Val
+-- match es schs j rs = filter (\r -> evalRule es schs j r) rs
+match es schs j re = head re
+
+test = schedule rules [] jobs resources
+-- evalRule :: [Exp] -> Val -> Val -> Val -> Bool
+-- evalRule es schs j r = foldl(\e a -> a && eval (schs, j, r) e) True es
   
-e1 = Get ["role", "kinds"] jacky
-e2 = Apply Filter ["role", "type"] (StringVal "Leader") resources
-e3 = Group ["date"] jobs
+eval :: (Val,Val,Val) -> Exp -> Val
+eval ctx (Where ks (ExpVal exp1) (ExpVal exp2)) = eval ctx $ Where ks (eval ctx exp1) (eval ctx exp2)
+eval ctx (Where ks v os) = where' ks v os
+eval ctx (Last (ExpVal exp)) = eval ctx $ Last $ eval ctx exp
+eval ctx (Last (ListVal os)) = last os
+eval ctx (Get k (ExpVal exp)) = eval ctx $ Get k (eval ctx exp)
+eval (schs, j, r) (Get k (ContextVal v))
+  | v == Schedules = schs
+  | v == Job = j
+  | v == Res = schs
+eval ctx (Get k v) = get k v
+eval ctx (Count (ExpVal exp)) = eval ctx $ Count $ eval ctx exp
+eval ctx (Count (ListVal os)) = IntVal $ length os
+eval ctx (GreaterEq (ExpVal exp1) (ExpVal exp2)) = eval ctx $ GreaterEq (eval ctx exp1) (eval ctx exp2)
+eval ctx (GreaterEq v1 v2) = BoolVal $ v1 >= v2
+eval ctx (Diff (ExpVal exp1) (ExpVal exp2)) = eval ctx $ Diff (eval ctx exp1) (eval ctx  exp2)
+eval ctx (Diff (IntVal i1) (IntVal i2)) = IntVal $ i1 - i2
+       
+where' :: [Key] -> Val -> Val -> Val
+where' ks v (ListVal os) = ListVal [o | o <- os
+                            , checkKeyVal ks v o]
 
-evalExp :: Exp -> Val
-evalExp (Get ks (ObjectVal es)) = getVal ks es
+checkKeyVal :: [Key] -> Val -> Val -> Bool
+checkKeyVal [] v o = False
+checkKeyVal (k:ks) v o = let res = (get k o)
+                         in case res of
+                           (ListVal ls) -> or [checkKeyVal ks v l | l <- ls]
+                           (ObjVal ov) -> checkKeyVal ks v res
+                           _ -> res == v
+                           
+get :: Key -> Val -> Val
+get k (ObjVal ps) = let res = [v | (Prop k' v) <- ps
+                                    , k' == k]
+                       in if length res == 0 then None
+                          else head res
 
-evalSelect :: Select -> [Val]
-evalSelect (Filter ks v vs) = filterByVal ks v vs 
+select :: Key -> [Val] -> [Val]
+select k vs =  [ v | (ObjVal vs') <- vs
+                   , (Prop k' v) <- vs'
+                   , k' == k]
 
-filterByVal :: [Key] -> Val -> [Val] -> [Val]
-filterByVal ks v vs = filter (\(ObjectVal xs) -> getVal ks xs == v) vs
-
-evalAggr :: Aggr -> Val
-evalAggr (Count xs) = IntVal $ length xs
-
-evalNest :: Nest -> [[Val]]
-evalNest (Group ks vs) = groupBy (\(ObjectVal xs) (ObjectVal ys) -> 
-                                   getVal ks xs == getVal ks ys) vs
+-- group' :: [Key] -> [Val] -> [[Val]]
+-- group' ks vs = groupBy (\x y -> 
+--                         get ks x == get ks y) vs
 
 
-forall :: Forall -> [[a]] -> [a]
-forall  = 
+-- get :: [Key] -> Val -> Val
+-- get (key:ks) (ObjVal es) =
+--   let found = find (\(Prop k v) -> key == k) es
+--   in if found == Nothing then None
+--      else let (Just (Prop k v)) = found
+--           in case v of
+--               ObjVal obj -> get ks v 
+--               otherwise -> v
 
-  
-getVal :: [Key] -> [Entity] -> Val
-getVal (key:ks) es =
-  let found = find (\(Prop k v) -> key == k) es
-  in if found == Nothing then None
-     else let (Just (Prop k v)) = found
-          in case v of
-              ObjectVal obj -> getVal ks obj 
-              otherwise -> v
+top :: Int -> [Val] -> [Val]
+top n vs = take n vs
+
+index :: (Int, Val) -> Val
+index (i,v) = IntVal i
+
+count :: [Val] -> Val
+count vs = IntVal $ length vs 
+
+
+apply :: ([Val]-> [Val]) -> [[Val]] -> [Val]
+apply fn vss = concat [fn vs | vs <- vss]
+
+diff :: Val -> Val -> Val
+diff (IntVal v1) (IntVal v2) = IntVal $  v1 - v2
+
+-- test1 = select "job" schedules
+-- test2 = group' ["date"] test1
+-- test3 = apply (top 1) test2
+-- test4 = where' ["date"] (get ["date"] $ jacky) test3
+-- test5 = last test4
+-- test6 = index test5 = diff (count test3) test6 > (get ["cooldown"] $ ObjVal jacky)
+
+
+-- e1 = Get ["role", "kinds"] jacky
+-- e2 = Apply Filter ["role", "type"] (StringVal "Leader") resources
+
+-- evalExp :: Exp -> Val
+-- evalExp (Get ks (ObjVal es)) = get ks es
+
+-- evalSelect :: Select -> [Val]
+-- evalSelect (Filter ks v vs) = filterByVal ks v vs 
+
+-- filterByVal :: [Key] -> Val -> [Val] -> [Val]
+-- filterByVal ks v vs = filter (\(ObjVal xs) -> get ks xs == v) vs
+
+-- evalAggr :: Aggr -> Val
+-- evalAggr (Count xs) = IntVal $ length xs
+
+-- evalNest :: Nest -> [[Val]]
+-- evalNest (Group ks vs) = groupBy (\(ObjVal xs) (ObjVal ys) -> 
+--                                    get ks xs == get ks ys) vs
+
+
         
 -- evalPre :: Predicate -> Bool
 -- evalPre (Eq e1 e2) = and [v1 == v2 | (Prop k1 v1) <- res1
@@ -172,10 +283,10 @@ getVal (key:ks) es =
 -- eq "name" e1 "name" e2
 
 -- evalExpr (Predicate o e1 e2) = BoolVal $ eval o (evalExpr e1) (evalExpr e2)
--- evalExpr (Extract k e) = fromJust $ getValue k e
+-- evalExpr (Extract k e) = fromJust $ getue k e
 
--- getValue :: String -> Prop -> 
--- getValue s ps = let res  = filter (\(k v) -> k == s) ps
+-- getue :: String -> Prop -> 
+-- getue s ps = let res  = filter (\(k v) -> k == s) ps
                        
                        
                        
@@ -253,10 +364,10 @@ getVal (key:ks) es =
 --                  ) rows
 
 -- evalExpr (Predicate o e1 e2) = BoolVal $ eval o (evalExpr e1) (evalExpr e2)
--- evalExpr (Extract k e) = fromJust $ getValue k e
+-- evalExpr (Extract k e) = fromJust $ getue k e
 
--- getValue :: String -> Entity -> Maybe Val
--- getValue s (Props ps) = let res  = find (\ (Var k v) -> k == s) ps
+-- getue :: String -> Entity -> Maybe Val
+-- getue s (Props ps) = let res  = find (\ (Var k v) -> k == s) ps
 --                         in case res of
 --                         Nothing -> Nothing
 --                         Just (Var k v) ->  Just v
