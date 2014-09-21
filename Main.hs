@@ -130,6 +130,39 @@ schedules =
 
 
 
+
+
+rules = [rule1]
+
+-- schedule rules [] (ListVal jobs) (ListVal resources)
+genTeam :: Int -> Val -> Val -> Val
+genTeam i ro re = ObjVal [ Prop "role" ro
+                         , Prop "index" $ IntVal i
+                         , Prop "res" re]
+
+genSchedule :: Int -> Val -> Val -> Val
+genSchedule i j t = ObjVal [ Prop "index" $ IntVal i
+                           , Prop "job" j
+                           , Prop "team" t]
+                    
+schedule :: [Exp] -> [Val] -> [Val] -> [Val] -> [Val]
+schedule es schs js re = [ genSchedule i j $ ListVal $ assign es schs j re
+                         | (i, j) <- zip [0.. length js] js ]
+                          
+assign :: [Exp] -> [Val] -> Val -> [Val] -> [Val]
+assign es schs j re = let (ListVal ros) = get "roles" j
+                      in [ genTeam i ro $ match es schs j re
+                         | (i,ro) <- zip [0.. (length ros - 1)] ros]
+                         
+match :: [Exp] -> [Val] -> Val -> [Val] -> Val
+-- match es schs j rs = filter (\r -> evalRule es schs j r) rs
+match es schs j re = head re
+
+test = schedule rules [] jobs resources
+-- evalRule :: [Exp] -> Val -> Val -> Val -> Bool
+-- evalRule es schs j r = foldl(\e a -> a && eval (schs, j, r) e) True es
+
+
 rule1 = GreaterEq
          (ExpVal (Diff 
                   (ExpVal $ Count $ ContextVal Schedules)
@@ -143,44 +176,41 @@ rule1 = GreaterEq
          )
          (ExpVal (Get "cooldown" $ ContextVal Res))
 
+rule2 = Where ["index"] (IntVal 0) (ContextVal Schedules)
+result = eval (ListVal schedules, job1, jacky) rule1
 
-rules = [rule1]
 
--- schedule rules [] (ListVal jobs) (ListVal resources)
-genTeam :: Int -> Val -> Val -> Val
-genTeam i ro re = ObjVal [ Prop "role" ro
-                         , Prop "index" $ IntVal i
-                         , Prop "res" re]
-                    
-schedule :: [Exp] -> [Val] -> [Val] -> [Val] -> [Val]
-schedule es schs (j:js) re = let (ListVal ros) = get "roles" j
-                             in [ genTeam i ro $ match es schs j re
-                                | i <- [0.. (length ros)]
-                                , ro <- ros]
-
-match :: [Exp] -> [Val] -> Val -> [Val] -> Val
--- match es schs j rs = filter (\r -> evalRule es schs j r) rs
-match es schs j re = head re
-
-test = schedule rules [] jobs resources
--- evalRule :: [Exp] -> Val -> Val -> Val -> Bool
--- evalRule es schs j r = foldl(\e a -> a && eval (schs, j, r) e) True es
-  
-eval :: (Val,Val,Val) -> Exp -> Val
-eval ctx (Where ks (ExpVal exp1) (ExpVal exp2)) = eval ctx $ Where ks (eval ctx exp1) (eval ctx exp2)
-eval ctx (Where ks v os) = where' ks v os
-eval ctx (Last (ExpVal exp)) = eval ctx $ Last $ eval ctx exp
-eval ctx (Last (ListVal os)) = last os
-eval ctx (Get k (ExpVal exp)) = eval ctx $ Get k (eval ctx exp)
-eval (schs, j, r) (Get k (ContextVal v))
+getContextVal :: Context -> (Val,Val,Val) -> Val
+getContextVal v (schs, j, r)
   | v == Schedules = schs
   | v == Job = j
   | v == Res = schs
+
+eval :: (Val,Val,Val) -> Exp -> Val
+
+eval ctx (Where ks (ExpVal exp1) (ExpVal exp2)) = eval ctx $ Where ks (eval ctx exp1) (eval ctx exp2)
+eval ctx (Where ks v (ExpVal exp2)) = eval ctx $ Where ks v (eval ctx exp2)
+eval ctx (Where ks (ExpVal exp1) os) = eval ctx $ Where ks (eval ctx exp1) os
+eval ctx (Where ks (ContextVal v) (ContextVal os)) = eval ctx $ Where ks (getContextVal v ctx) (getContextVal os ctx)
+eval ctx (Where ks v (ContextVal os)) = eval ctx $ Where ks v (getContextVal os ctx)
+eval ctx (Where ks (ContextVal v) os) = eval ctx $ Where ks (getContextVal v ctx) os
+eval ctx (Where ks v os) = where' ks v os
+
+eval ctx (Last (ExpVal exp)) = eval ctx $ Last $ eval ctx exp
+eval ctx (Last (ListVal os)) = last os
+
+eval ctx (Get k (ExpVal exp)) = eval ctx $ Get k (eval ctx exp)
+eval ctx (Get k (ContextVal v)) = getContextVal v ctx
 eval ctx (Get k v) = get k v
+
 eval ctx (Count (ExpVal exp)) = eval ctx $ Count $ eval ctx exp
+eval ctx (Count (ContextVal v)) = eval ctx $ Count $ getContextVal v ctx
+
 eval ctx (Count (ListVal os)) = IntVal $ length os
+
 eval ctx (GreaterEq (ExpVal exp1) (ExpVal exp2)) = eval ctx $ GreaterEq (eval ctx exp1) (eval ctx exp2)
 eval ctx (GreaterEq v1 v2) = BoolVal $ v1 >= v2
+
 eval ctx (Diff (ExpVal exp1) (ExpVal exp2)) = eval ctx $ Diff (eval ctx exp1) (eval ctx  exp2)
 eval ctx (Diff (IntVal i1) (IntVal i2)) = IntVal $ i1 - i2
        
