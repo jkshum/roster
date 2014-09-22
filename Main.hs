@@ -20,8 +20,11 @@ data Exp = Where [Key] Val Val
          deriving (Show, Eq, Ord)
                         
 data Entity = Prop Key Val
-            deriving (Show, Eq, Ord)
+            deriving (Eq, Ord)
 
+instance Show (Entity) where
+  show (Prop k v) = show k ++ ":" ++ show v
+  
 data Val = IntVal Int
          | BoolVal Bool
          | StringVal String
@@ -30,8 +33,19 @@ data Val = IntVal Int
          | ExpVal Exp
          | ContextVal Context
          | None
-         deriving (Show, Eq, Ord)
-                  
+         deriving (Eq, Ord)
+
+instance Show (Val) where
+  show (IntVal a) = show a
+  show (BoolVal a) = show a
+  show (StringVal a) = show a
+  show (ObjVal a) = show a
+  show (ListVal a) = show a
+  show (ExpVal a) = show a
+  show (ContextVal a) = show a
+
+
+  
 jacky = ObjVal
   [ Prop "name" $ StringVal "Jacky"
   , Prop "id" $ StringVal "1"
@@ -147,7 +161,7 @@ genSchedule i j t = ObjVal [ Prop "index" $ IntVal i
                     
 schedule :: [Exp] -> [Val] -> [Val] -> [Val] -> [Val]
 schedule es schs js re = [ genSchedule i j $ ListVal $ assign es schs j re
-                         | (i, j) <- zip [0.. length js] js ]
+                         | (i, j) <- zip [0.. (length js - 1)] js ]
                           
 assign :: [Exp] -> [Val] -> Val -> [Val] -> [Val]
 assign es schs j re = let (ListVal ros) = get "roles" j
@@ -177,7 +191,7 @@ rule1 = GreaterEq
          (ExpVal (Get "cooldown" $ ContextVal Res))
 
 rule2 = Where ["index"] (IntVal 0) (ContextVal Schedules)
-result = eval (ListVal schedules, job1, jacky) rule1
+result = eval (ListVal test, job1, jacky) rule1
 
 
 getContextVal :: Context -> (Val,Val,Val) -> Val
@@ -494,6 +508,7 @@ diff (IntVal v1) (IntVal v2) = IntVal $  v1 - v2
 -- match _ _ [] = do return []
 -- match j ps (r:rs) = do res <- assign j ps r
 --                        matched <- match j (consume (snd res) ps ) rs
+
 --                        return $ res: matched
 
 -- consume :: Maybe Person -> [Person] -> [Person]
