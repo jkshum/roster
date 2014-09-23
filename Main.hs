@@ -194,31 +194,34 @@ rule2 = Where ["index"] (IntVal 0) (ContextVal Schedules)
 result = eval (ListVal test, job1, jacky) rule1
 
 
-getContextVal :: Context -> (Val,Val,Val) -> Val
-getContextVal v (schs, j, r)
-  | v == Schedules = schs
-  | v == Job = j
-  | v == Res = schs
+getVal :: (Val,Val,Val) ->Exp -> Val
+getVal ctx (ExpVal e) = eval ctx e
+getVal (schs, j, r) (ContextVal e) 
+  | e == Schedules = schs
+  | e == Job = j
+  | e == Res = schs
+getVal ctx v = v
+               
 
 eval :: (Val,Val,Val) -> Exp -> Val
 
 eval ctx (Where ks (ExpVal exp1) (ExpVal exp2)) = eval ctx $ Where ks (eval ctx exp1) (eval ctx exp2)
 eval ctx (Where ks v (ExpVal exp2)) = eval ctx $ Where ks v (eval ctx exp2)
 eval ctx (Where ks (ExpVal exp1) os) = eval ctx $ Where ks (eval ctx exp1) os
-eval ctx (Where ks (ContextVal v) (ContextVal os)) = eval ctx $ Where ks (getContextVal v ctx) (getContextVal os ctx)
-eval ctx (Where ks v (ContextVal os)) = eval ctx $ Where ks v (getContextVal os ctx)
-eval ctx (Where ks (ContextVal v) os) = eval ctx $ Where ks (getContextVal v ctx) os
+eval ctx (Where ks (ContextVal v) (ContextVal os)) = eval ctx $ Where ks (getVal v ctx) (getVal os ctx)
+eval ctx (Where ks v (ContextVal os)) = eval ctx $ Where ks v (getVal os ctx)
+eval ctx (Where ks (ContextVal v) os) = eval ctx $ Where ks (getVal v ctx) os
 eval ctx (Where ks v os) = where' ks v os
 
 eval ctx (Last (ExpVal exp)) = eval ctx $ Last $ eval ctx exp
 eval ctx (Last (ListVal os)) = last os
 
 eval ctx (Get k (ExpVal exp)) = eval ctx $ Get k (eval ctx exp)
-eval ctx (Get k (ContextVal v)) = getContextVal v ctx
+eval ctx (Get k (ContextVal v)) = getVal v ctx
 eval ctx (Get k v) = get k v
 
 eval ctx (Count (ExpVal exp)) = eval ctx $ Count $ eval ctx exp
-eval ctx (Count (ContextVal v)) = eval ctx $ Count $ getContextVal v ctx
+eval ctx (Count (ContextVal v)) = eval ctx $ Count $ getVal v ctx
 
 eval ctx (Count (ListVal os)) = IntVal $ length os
 
@@ -229,8 +232,8 @@ eval ctx (Diff (ExpVal exp1) (ExpVal exp2)) = eval ctx $ Diff (eval ctx exp1) (e
 eval ctx (Diff (IntVal i1) (IntVal i2)) = IntVal $ i1 - i2
        
 where' :: [Key] -> Val -> Val -> Val
-where' ks v (ListVal os) = ListVal [o | o <- os
-                            , checkKeyVal ks v o]
+where' ks v (ListVal os) = ListVal [ o | o <- os
+                                       , checkKeyVal ks v o]
 
 checkKeyVal :: [Key] -> Val -> Val -> Bool
 checkKeyVal [] v o = False
