@@ -18,6 +18,8 @@ data Exp = Where [Key] Val Val
          | GreaterEq Val Val
          | Eq Val Val
          | Diff Val Val
+         | In Val Val
+         | Not Val
          deriving (Show, Eq, Ord)
                         
 data Entity = Prop Key Val
@@ -44,22 +46,20 @@ instance Show (Val) where
   show (ListVal a) = show a
   show (ExpVal a) = show a
   show (ContextVal a) = show a
-
-
   
 jacky = ObjVal
   [ Prop "name" $ StringVal "Jacky"
   , Prop "id" $ StringVal "1"
-  , Prop "date" $ IntVal 6
+  , Prop "blockedDates" $ ListVal [IntVal 6]
   , Prop "cooldown" $ IntVal 2
   , Prop "availability" $ IntVal 1
   , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
-                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                    , Prop "kinds" $ ListVal [ StringVal "Sat"
                                                              , StringVal "Morning"]
                                     ]
                            , ObjVal [ Prop "type" $ StringVal "Vocal"
                                     , Prop "kinds" $ ListVal [ StringVal "Sun"
-                                                             , StringVal "Morning"]
+                                                             , StringVal "Sat"]
                                     ]
                            ]
   ]
@@ -67,7 +67,7 @@ jacky = ObjVal
 timmy = ObjVal
   [ Prop "name" $ StringVal "Timmy"
   , Prop "id" $ StringVal "1"
-  , Prop "date" $ IntVal 13
+  , Prop "blockedDates" $ ListVal [IntVal 13]
   , Prop "cooldown" $ IntVal 2
   , Prop "availability" $ IntVal 1
   , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
@@ -85,14 +85,10 @@ timmy = ObjVal
 lok = ObjVal
   [ Prop "name" $ StringVal "Lok"
   , Prop "id" $ StringVal "1"
-  , Prop "date" $ IntVal 6
+  , Prop "blockedDates" $ ListVal [ IntVal 6]
   , Prop "cooldown" $ IntVal 2
   , Prop "availability" $ IntVal 1
   , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
-                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
-                                                             , StringVal "Morning"]
-                                    ]
-                           , ObjVal [ Prop "type" $ StringVal "Vocal"
                                     , Prop "kinds" $ ListVal [ StringVal "Sun"
                                                              , StringVal "Morning"]
                                     ]
@@ -101,21 +97,45 @@ lok = ObjVal
 
 
 resources :: [Val]
-resources = [jacky, timmy]
+resources = [jacky, timmy, lok]
 
 job1 = ObjVal
   [ Prop "date" $ IntVal 6
+  , Prop "kind" $ StringVal "Sat"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
   ]
 
 job2 = ObjVal
-  [ Prop "date" $ IntVal 13
+  [ Prop "date" $ IntVal 6
+  , Prop "kind" $ StringVal "Morning"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
   ]
 
-jobs = [job1, job2]
+
+job3 = ObjVal
+  [ Prop "date" $ IntVal 13
+  , Prop "kind" $ StringVal "Sat"
+  , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"]
+  ]
+  
+job4 = ObjVal
+  [ Prop "date" $ IntVal 13
+  , Prop "kind" $ StringVal "Morning"
+  , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"]
+  ]
+job5 = ObjVal
+  [ Prop "date" $ IntVal 13
+  , Prop "kind" $ StringVal "Sun"
+  , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"]
+  ]
+
+
+jobs = [job1, job2, job3, job4, job5]
 
 -- schedules = 
 --     [ ObjVal [ Prop "job" job1
@@ -151,7 +171,7 @@ rule1 = GreaterEq
                   (ExpVal $ Count $ ContextVal Schedules)
                   (ExpVal (Get "index" (ExpVal $ Last $ ExpVal $
                                         Where ["team", "res", "name"]
-                                        (StringVal "Jacky") (ContextVal Schedules)
+                                        (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules)
                                        )
                           )
                   )
@@ -159,11 +179,17 @@ rule1 = GreaterEq
          )
          (ExpVal (Get "cooldown" $ ContextVal Res))
 
-rule2 = Eq (ExpVal (Get "date" $ ContextVal Job)) (ExpVal (Get "date" $ ContextVal Res))
-rules = [rule2]
+rule2 = Not $ ExpVal $ In (ExpVal (Get "date" $ ContextVal Job)) (ExpVal (Get "blockedDates" $ ContextVal Res))
+rule3 = GreaterEq
+        (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
+        (ExpVal (Get "availability" $ ContextVal Res))
+
+rule4 = 
+
+  
+rules = [rule1, rule2, rule3]
 
 result = eval (ListVal test, job1, jacky) rule1
-
 
 genTeam :: Int -> Val -> Val -> Val
 genTeam i ro re = ObjVal [ Prop "role" ro
@@ -188,7 +214,6 @@ match :: [Exp] -> [Val] -> Val -> [Val] -> Val
 match es schs j rs = head $ filter (\r ->
                                      and [ let (BoolVal res) = eval (ListVal schs, j, r) e
                                            in res | e <- es]) rs
-
 
 
 
@@ -217,7 +242,13 @@ eval ctx (GreaterEq v1 v2) = BoolVal $ (getVal ctx v1) >= (getVal ctx v2)
 
 eval ctx (Eq v1 v2) = BoolVal $ (getVal ctx v1) == (getVal ctx v2)
 
-eval ctx (Diff v1 v2) = liftIntVal2 (+) v1 v2
+eval ctx (Diff v1 v2) = liftIntVal2 (+) (getVal ctx v1) (getVal ctx v2)
+
+eval ctx (In v1 v2) = let (ListVal vs) = getVal ctx v2
+                      in BoolVal $ elem (getVal ctx v1) vs
+
+eval ctx (Not v) = let (BoolVal res) = getVal ctx v                         
+                   in BoolVal $ not res
                                            
 where' :: [Key] -> Val -> Val -> Val
 where' ks v (ListVal os) = ListVal [ o | o <- os
