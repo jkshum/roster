@@ -11,7 +11,7 @@ data Context = Schedules | Job | Res
                       
 type Key = String
 
-data Exp = Where Val [Key] Val
+data Exp = Where [Key] Exp
          | Last Val
          | Get Key Val
          | Count Val
@@ -19,7 +19,6 @@ data Exp = Where Val [Key] Val
          | Eq Val Val
          | Diff Val Val
          | In Val Val
-         | Keypath [Key] Val
          | Not Val
          deriving (Show, Eq, Ord)
                         
@@ -172,7 +171,8 @@ rule1 = GreaterEq
                   (ExpVal $ Count $ ContextVal Schedules)
                   (ExpVal (Get "index" (ExpVal $ Last $ ExpVal $
                                         Where ["team", "res", "name"]
-                                        (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules)
+                                        $ Eq (ExpVal $ Get "name" $ ContextVal Res)
+                                        (ContextVal Schedules)
                                        )
                           )
                   )
@@ -181,14 +181,14 @@ rule1 = GreaterEq
          (ExpVal (Get "cooldown" $ ContextVal Res))
 
 rule2 = Not $ ExpVal $ In (ExpVal (Get "date" $ ContextVal Job)) (ExpVal (Get "blockedDates" $ ContextVal Res))
-rule3 = GreaterEq
-        (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
-        (ExpVal $ Get "availability" $ ContextVal Res)
+-- rule3 = GreaterEq
+--         (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
+--         (ExpVal $ Get "availability" $ ContextVal Res)
 
-rule4 = Where ["roles", "type"]  (ExpVal $ Get "kind" $ ContextVal Job) (Get "roles" $ ContextVal Res)
+-- rule4 = Where ["roles", "type"]  (ExpVal $ Get "kind" $ ContextVal Job) (Get "roles" $ ContextVal Res)
 
   
-rules = [rule1, rule2, rule3]
+rules = [rule2]
 
 result = eval (ListVal test, job1, jacky) rule1
 
@@ -230,7 +230,8 @@ getVal ctx v = v
 eval :: (Val,Val,Val) -> Exp -> Val
 
 
-eval ctx (Where ks v os) = where' ks (getVal ctx v) (getVal ctx os)
+eval ctx (Where ks (Eq v1 v2)) = where' (==) ks (getVal ctx v1) (getVal ctx v2)
+ -- where' ks (getVal ctx v) (getVal ctx os)
 
 eval ctx (Last v) = let (ListVal res) = (getVal ctx v)
                     in last res
@@ -252,18 +253,17 @@ eval ctx (In v1 v2) = let (ListVal vs) = getVal ctx v2
 eval ctx (Not v) = let (BoolVal res) = getVal ctx v                         
                    in BoolVal $ not res
                                            
-where' :: [Key] -> Val -> Val -> Val
-where' ks v (ListVal os) = ListVal [ o | o <- os
-                                       , checkKeyVal ks v o]
-
-checkKeyVal :: [Key] -> Val -> Val -> Bool
-checkKeyVal [] v o = False
-checkKeyVal (k:ks) v o = let res = (get k o)
-                         in case res of
-                           (ListVal ls) -> or [checkKeyVal ks v l | l <- ls]
-                           (ObjVal ov) -> checkKeyVal ks v res
-                           _ -> res == v
-                           
+where' :: (Val -> Val -> Bool) -> [Key] -> Val -> Val -> Val
+where' fn ks v (ListVal os) = ListVal [ o | o <- os
+                                          , checkKeyVal fn ks v o]
+                              
+checkKeyVal :: (Val -> Val -> Bool) -> [Key] -> Val -> Val -> Bool
+checkKeyVal fn [] v o = False
+checkKeyVal fn (k:ks) v o = let res = (get k o)
+                            in case res of
+                            (ListVal ls) -> or [checkKeyVal fn ks v l | l <- ls]
+                            (ObjVal ov) -> checkKeyVal fn ks v res
+                            _ -> fn res v
 get :: Key -> Val -> Val
 get k (ObjVal ps) = let res = [v | (Prop k' v) <- ps
                                     , k' == k]
