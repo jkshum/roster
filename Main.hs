@@ -8,10 +8,10 @@ import Control.Monad.Identity
 
 data Context = Schedules | Job | Res
              deriving (Show, Eq, Ord)
-                  
+                      
 type Key = String
 
-data Exp = Where [Key] Val Val
+data Exp = Where Val [Key] Val
          | Last Val
          | Get Key Val
          | Count Val
@@ -19,6 +19,7 @@ data Exp = Where [Key] Val Val
          | Eq Val Val
          | Diff Val Val
          | In Val Val
+         | Keypath [Key] Val
          | Not Val
          deriving (Show, Eq, Ord)
                         
@@ -182,9 +183,9 @@ rule1 = GreaterEq
 rule2 = Not $ ExpVal $ In (ExpVal (Get "date" $ ContextVal Job)) (ExpVal (Get "blockedDates" $ ContextVal Res))
 rule3 = GreaterEq
         (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
-        (ExpVal (Get "availability" $ ContextVal Res))
+        (ExpVal $ Get "availability" $ ContextVal Res)
 
-rule4 = 
+rule4 = Where ["roles", "type"]  (ExpVal $ Get "kind" $ ContextVal Job) (Get "roles" $ ContextVal Res)
 
   
 rules = [rule1, rule2, rule3]
@@ -227,6 +228,7 @@ getVal (schs, j, r) (ContextVal e)
 getVal ctx v = v
 
 eval :: (Val,Val,Val) -> Exp -> Val
+
 
 eval ctx (Where ks v os) = where' ks (getVal ctx v) (getVal ctx os)
 
