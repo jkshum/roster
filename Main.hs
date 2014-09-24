@@ -16,6 +16,7 @@ data Exp = Where [Key] Val Val
          | Get Key Val
          | Count Val
          | GreaterEq Val Val
+         | Eq Val Val
          | Diff Val Val
          deriving (Show, Eq, Ord)
                         
@@ -66,7 +67,7 @@ jacky = ObjVal
 timmy = ObjVal
   [ Prop "name" $ StringVal "Timmy"
   , Prop "id" $ StringVal "1"
-  , Prop "date" $ IntVal 6
+  , Prop "date" $ IntVal 13
   , Prop "cooldown" $ IntVal 2
   , Prop "availability" $ IntVal 1
   , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
@@ -116,34 +117,52 @@ job2 = ObjVal
 
 jobs = [job1, job2]
 
-schedules = 
-    [ ObjVal [ Prop "job" job1
-             , Prop "index" $ IntVal 0
-             , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
-                                              , Prop "index" $ IntVal 0
-                                              , Prop "res" jacky
-                                              ]
-                                     , ObjVal [ Prop "role" $ StringVal "Vocal"
-                                              , Prop "index" $ IntVal 1
-                                              , Prop "res" lok
-                                              ]
-                                     ]
-             ]
-    , ObjVal [ Prop "job" job2
-             , Prop "index" $ IntVal 1
-             , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
-                                              , Prop "index" $ IntVal 0
-                                              , Prop "res" timmy]
-                                     , ObjVal [ Prop "role" $ StringVal "Vocal"
-                                              , Prop "index" $ IntVal 1
-                                              , Prop "res" timmy]
-                                     ]
-             ]  
-    ]
+-- schedules = 
+--     [ ObjVal [ Prop "job" job1
+--              , Prop "index" $ IntVal 0
+--              , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
+--                                               , Prop "index" $ IntVal 0
+--                                               , Prop "res" jacky
+--                                               ]
+--                                      , ObjVal [ Prop "role" $ StringVal "Vocal"
+--                                               , Prop "index" $ IntVal 1
+--                                               , Prop "res" lok
+--                                               ]
+--                                      ]
+--              ]
+--     , ObjVal [ Prop "job" job2
+--              , Prop "index" $ IntVal 1
+--              , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
+--                                               , Prop "index" $ IntVal 0
+--                                               , Prop "res" timmy]
+--                                      , ObjVal [ Prop "role" $ StringVal "Vocal"
+--                                               , Prop "index" $ IntVal 1
+--                                               , Prop "res" timmy]
+--                                      ]
+--              ]  
+--     ]
 
 
 
-rules = [rule1]
+test = schedule rules [] jobs resources
+
+rule1 = GreaterEq
+         (ExpVal (Diff 
+                  (ExpVal $ Count $ ContextVal Schedules)
+                  (ExpVal (Get "index" (ExpVal $ Last $ ExpVal $
+                                        Where ["team", "res", "name"]
+                                        (StringVal "Jacky") (ContextVal Schedules)
+                                       )
+                          )
+                  )
+                 )
+         )
+         (ExpVal (Get "cooldown" $ ContextVal Res))
+
+rule2 = Eq (ExpVal (Get "date" $ ContextVal Job)) (ExpVal (Get "date" $ ContextVal Res))
+rules = [rule2]
+
+result = eval (ListVal test, job1, jacky) rule1
 
 
 genTeam :: Int -> Val -> Val -> Val
@@ -161,31 +180,16 @@ schedule es schs js re = [ genSchedule i j $ ListVal $ assign es schs j re
                          | (i, j) <- zip [0.. (length js - 1)] js ]
                           
 assign :: [Exp] -> [Val] -> Val -> [Val] -> [Val]
-assign es schs j re = let (ListVal ros) = get "roles" j
-                      in [ genTeam i ro $ match es schs j re
+assign es schs j rs = let (ListVal ros) = get "roles" j
+                      in [ genTeam i ro $ match es schs j rs
                          | (i,ro) <- zip [0.. (length ros - 1)] ros]
                          
 match :: [Exp] -> [Val] -> Val -> [Val] -> Val
--- match es schs j rs = filter (\r -> evalRule es schs j r) rs
-match es schs j re = head re
+match es schs j rs = head $ filter (\r ->
+                                     and [ let (BoolVal res) = eval (ListVal schs, j, r) e
+                                           in res | e <- es]) rs
 
-test = schedule rules [] jobs resources
 
-rule1 = GreaterEq
-         (ExpVal (Diff 
-                  (ExpVal $ Count $ ContextVal Schedules)
-                  (ExpVal (Get "index" (ExpVal $ Last $ ExpVal $
-                                        Where ["team", "res", "name"]
-                                        (StringVal "Jacky") (ContextVal Schedules)
-                                       )
-                          )
-                  )
-                 )
-         )
-         (ExpVal (Get "cooldown" $ ContextVal Res))
-
-rule2 = Where ["index"] (IntVal 0) (ContextVal Schedules)
-result = eval (ListVal test, job1, jacky) rule1
 
 
 getVal :: (Val,Val,Val) -> Val -> Val
@@ -211,9 +215,9 @@ eval ctx (Count v) = let (ListVal res) = (getVal ctx v)
 
 eval ctx (GreaterEq v1 v2) = BoolVal $ (getVal ctx v1) >= (getVal ctx v2)
 
-eval ctx (Diff v1 v2) = let (IntVal i1) = (getVal ctx v1)
-                            (IntVal i2) = (getVal ctx v2)
-                        in IntVal $ i1 - i2
+eval ctx (Eq v1 v2) = BoolVal $ (getVal ctx v1) == (getVal ctx v2)
+
+eval ctx (Diff v1 v2) = liftIntVal2 (+) v1 v2
                                            
 where' :: [Key] -> Val -> Val -> Val
 where' ks v (ListVal os) = ListVal [ o | o <- os
@@ -238,3 +242,7 @@ select k vs =  [ v | (ObjVal vs') <- vs
                    , (Prop k' v) <- vs'
                    , k' == k]
 
+
+liftIntVal2 :: (Int -> Int -> Int) -> Val -> Val -> Val
+liftIntVal2 f (IntVal a) (IntVal b) = IntVal $ f a b 
+  
