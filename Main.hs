@@ -88,7 +88,7 @@ lok = ObjVal
   , Prop "blockedDates" $ ListVal [ IntVal 6]
   , Prop "cooldown" $ IntVal 2
   , Prop "availability" $ IntVal 1
-  , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
+  , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Vocal"
                                     , Prop "kinds" $ ListVal [ StringVal "Sun"
                                                              , StringVal "Morning"]
                                     ]
@@ -181,14 +181,17 @@ rule1 = GreaterEq
          (ExpVal (Get "cooldown" $ ContextVal Res))
 
 rule2 = Not $ ExpVal $ In (ExpVal (Get "date" $ ContextVal Job)) (ExpVal (Get "blockedDates" $ ContextVal Res))
--- rule3 = GreaterEq
---         (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
---         (ExpVal $ Get "availability" $ ContextVal Res)
+rule3 = GreaterEq
+        (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] $ Eq (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
+        (ExpVal $ Get "availability" $ ContextVal Res)
 
+
+dummy = (ListVal [], None, None)
+rulewhere = Where ["roles", "kinds"] $ In  (StringVal "Sat") (ListVal resources)
 -- rule4 = Where ["roles", "type"]  (ExpVal $ Get "kind" $ ContextVal Job) (Get "roles" $ ContextVal Res)
 
   
-rules = [rule2]
+rules = [rule1]
 
 result = eval (ListVal test, job1, jacky) rule1
 
@@ -227,10 +230,11 @@ getVal (schs, j, r) (ContextVal e)
                
 getVal ctx v = v
 
+
 eval :: (Val,Val,Val) -> Exp -> Val
 
-
 eval ctx (Where ks (Eq v1 v2)) = where' (==) ks (getVal ctx v1) (getVal ctx v2)
+eval ctx (Where ks (In v1 v2)) = where' valIn ks (getVal ctx v1) (getVal ctx v2)
  -- where' ks (getVal ctx v) (getVal ctx os)
 
 eval ctx (Last v) = let (ListVal res) = (getVal ctx v)
@@ -247,12 +251,14 @@ eval ctx (Eq v1 v2) = BoolVal $ (getVal ctx v1) == (getVal ctx v2)
 
 eval ctx (Diff v1 v2) = liftIntVal2 (+) (getVal ctx v1) (getVal ctx v2)
 
-eval ctx (In v1 v2) = let (ListVal vs) = getVal ctx v2
-                      in BoolVal $ elem (getVal ctx v1) vs
+eval ctx (In v1 v2) = BoolVal $ valIn (getVal ctx v1) (getVal ctx v2)
 
 eval ctx (Not v) = let (BoolVal res) = getVal ctx v                         
                    in BoolVal $ not res
-                                           
+
+valIn :: Val -> Val -> Bool
+valIn v1 (ListVal vs) = elem v1 vs
+               
 where' :: (Val -> Val -> Bool) -> [Key] -> Val -> Val -> Val
 where' fn ks v (ListVal os) = ListVal [ o | o <- os
                                           , checkKeyVal fn ks v o]
@@ -261,9 +267,11 @@ checkKeyVal :: (Val -> Val -> Bool) -> [Key] -> Val -> Val -> Bool
 checkKeyVal fn [] v o = False
 checkKeyVal fn (k:ks) v o = let res = (get k o)
                             in case res of
-                            (ListVal ls) -> or [checkKeyVal fn ks v l | l <- ls]
+                            (ListVal ls) -> if length ks == 0 then fn v (ListVal ls)
+                                            else or [checkKeyVal fn ks v l | l <- ls]
                             (ObjVal ov) -> checkKeyVal fn ks v res
-                            _ -> fn res v
+                            _ -> fn v res
+                            
 get :: Key -> Val -> Val
 get k (ObjVal ps) = let res = [v | (Prop k' v) <- ps
                                     , k' == k]
