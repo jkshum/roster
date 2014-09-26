@@ -127,6 +127,7 @@ job4 = ObjVal
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
   ]
+
 job5 = ObjVal
   [ Prop "date" $ IntVal 13
   , Prop "kind" $ StringVal "Sun"
@@ -135,32 +136,32 @@ job5 = ObjVal
   ]
 
 
-jobs = [job1, job2, job3, job4, job5]
+jobs = [job1]
 
--- schedules = 
---     [ ObjVal [ Prop "job" job1
---              , Prop "index" $ IntVal 0
---              , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
---                                               , Prop "index" $ IntVal 0
---                                               , Prop "res" jacky
---                                               ]
---                                      , ObjVal [ Prop "role" $ StringVal "Vocal"
---                                               , Prop "index" $ IntVal 1
---                                               , Prop "res" lok
---                                               ]
---                                      ]
---              ]
---     , ObjVal [ Prop "job" job2
---              , Prop "index" $ IntVal 1
---              , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
---                                               , Prop "index" $ IntVal 0
---                                               , Prop "res" timmy]
---                                      , ObjVal [ Prop "role" $ StringVal "Vocal"
---                                               , Prop "index" $ IntVal 1
---                                               , Prop "res" timmy]
---                                      ]
---              ]  
---     ]
+schedules = 
+    [ ObjVal [ Prop "job" job1
+             , Prop "index" $ IntVal 0
+             , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
+                                              , Prop "index" $ IntVal 0
+                                              , Prop "res" jacky
+                                              ]
+                                     , ObjVal [ Prop "role" $ StringVal "Vocal"
+                                              , Prop "index" $ IntVal 1
+                                              , Prop "res" lok
+                                              ]
+                                     ]
+             ]
+    , ObjVal [ Prop "job" job2
+             , Prop "index" $ IntVal 1
+             , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
+                                              , Prop "index" $ IntVal 0
+                                              , Prop "res" timmy]
+                                     , ObjVal [ Prop "role" $ StringVal "Vocal"
+                                              , Prop "index" $ IntVal 1
+                                              , Prop "res" timmy]
+                                     ]
+             ]  
+    ]
 
 
 
@@ -185,11 +186,7 @@ rule3 = GreaterEq
         (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] $ Eq (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
         (ExpVal $ Get "availability" $ ContextVal Res)
 
-
-dummy = (ListVal [], None, None)
-rulewhere = Where ["roles", "kinds"] $ In  (StringVal "Sat") (ListVal resources)
--- rule4 = Where ["roles", "type"]  (ExpVal $ Get "kind" $ ContextVal Job) (Get "roles" $ ContextVal Res)
-
+rule4 = Where ["roles", "kinds"] $ In (ExpVal $ Get "kind" $ ContextVal Job) (ContextVal Res)
   
 rules = [rule1]
 
@@ -215,6 +212,7 @@ assign es schs j rs = let (ListVal ros) = get "roles" j
                          | (i,ro) <- zip [0.. (length ros - 1)] ros]
                          
 match :: [Exp] -> [Val] -> Val -> [Val] -> Val
+-- handle none
 match es schs j rs = head $ filter (\r ->
                                      and [ let (BoolVal res) = eval (ListVal schs, j, r) e
                                            in res | e <- es]) rs
@@ -227,9 +225,12 @@ getVal (schs, j, r) (ContextVal e)
   | e == Schedules = schs
   | e == Job = j
   | e == Res = r
-               
 getVal ctx v = v
 
+
+noneToZero :: Val -> Val
+noneToZero None = IntVal 0
+noneToZero v = v
 
 eval :: (Val,Val,Val) -> Exp -> Val
 
@@ -238,7 +239,8 @@ eval ctx (Where ks (In v1 v2)) = where' valIn ks (getVal ctx v1) (getVal ctx v2)
  -- where' ks (getVal ctx v) (getVal ctx os)
 
 eval ctx (Last v) = let (ListVal res) = (getVal ctx v)
-                    in last res
+                    in if length res == 0 then None
+                       else last res
 
 eval ctx (Get k v) = get k (getVal ctx v)
 
@@ -249,7 +251,7 @@ eval ctx (GreaterEq v1 v2) = BoolVal $ (getVal ctx v1) >= (getVal ctx v2)
 
 eval ctx (Eq v1 v2) = BoolVal $ (getVal ctx v1) == (getVal ctx v2)
 
-eval ctx (Diff v1 v2) = liftIntVal2 (+) (getVal ctx v1) (getVal ctx v2)
+eval ctx (Diff v1 v2) = liftIntVal2 (+) (noneToZero $ getVal ctx v1) (noneToZero $ getVal ctx v2)
 
 eval ctx (In v1 v2) = BoolVal $ valIn (getVal ctx v1) (getVal ctx v2)
 
@@ -273,6 +275,7 @@ checkKeyVal fn (k:ks) v o = let res = (get k o)
                             _ -> fn v res
                             
 get :: Key -> Val -> Val
+get k None = None
 get k (ObjVal ps) = let res = [v | (Prop k' v) <- ps
                                     , k' == k]
                        in if length res == 0 then None
