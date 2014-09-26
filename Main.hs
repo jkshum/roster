@@ -46,6 +46,7 @@ instance Show (Val) where
   show (ListVal a) = show a
   show (ExpVal a) = show a
   show (ContextVal a) = show a
+  show None = show "None"
   
 jacky = ObjVal
   [ Prop "name" $ StringVal "Jacky"
@@ -213,11 +214,12 @@ assign es schs j rs = let (ListVal ros) = get "roles" j
                          
 match :: [Exp] -> [Val] -> Val -> [Val] -> Val
 -- handle none
-match es schs j rs = head $ filter (\r ->
-                                     and [ let (BoolVal res) = eval (ListVal schs, j, r) e
-                                           in res | e <- es]) rs
-
-
+match es schs j rs =
+  let found = filter (\r ->
+                       and [ let (BoolVal res) = eval (ListVal schs, j, r) e
+                             in res | e <- es]) rs
+  in if length found == 0 then None
+     else head found
 
 getVal :: (Val,Val,Val) -> Val -> Val
 getVal ctx (ExpVal e) = eval ctx e
