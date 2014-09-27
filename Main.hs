@@ -3,6 +3,7 @@ module Main where
 import qualified Data.Map as Map
 import Data.List
 import Data.Maybe
+import Control.Monad   
 import Control.Monad.Reader
 import Control.Monad.Identity
 
@@ -53,29 +54,26 @@ jacky = ObjVal
   , Prop "id" $ StringVal "1"
   , Prop "blockedDates" $ ListVal [IntVal 6]
   , Prop "cooldown" $ IntVal 2
-  , Prop "availability" $ IntVal 1
+  , Prop "availability" $ IntVal 5
   , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
                                     , Prop "kinds" $ ListVal [ StringVal "Sat"
+                                                             , StringVal "Sun"
                                                              , StringVal "Morning"]
                                     ]
                            , ObjVal [ Prop "type" $ StringVal "Vocal"
-                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
-                                                             , StringVal "Sat"]
+                                    , Prop "kinds" $ ListVal [ StringVal "Sat"]
                                     ]
                            ]
   ]
+
 
 timmy = ObjVal
   [ Prop "name" $ StringVal "Timmy"
   , Prop "id" $ StringVal "1"
   , Prop "blockedDates" $ ListVal [IntVal 13]
   , Prop "cooldown" $ IntVal 2
-  , Prop "availability" $ IntVal 1
+  , Prop "availability" $ IntVal 5
   , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Leader"
-                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
-                                                             , StringVal "Morning"]
-                                    ]
-                           , ObjVal [ Prop "type" $ StringVal "Vocal"
                                     , Prop "kinds" $ ListVal [ StringVal "Sun"
                                                              , StringVal "Morning"]
                                     ]
@@ -86,11 +84,40 @@ timmy = ObjVal
 lok = ObjVal
   [ Prop "name" $ StringVal "Lok"
   , Prop "id" $ StringVal "1"
-  , Prop "blockedDates" $ ListVal [ IntVal 6]
+  , Prop "blockedDates" $ ListVal [ IntVal 20]
   , Prop "cooldown" $ IntVal 2
-  , Prop "availability" $ IntVal 1
+  , Prop "availability" $ IntVal 5
   , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Vocal"
                                     , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                                             , StringVal "Sat"
+                                                             , StringVal "Morning"]
+                                    ]
+                           ]
+  ]
+
+chung = ObjVal
+  [ Prop "name" $ StringVal "chung"
+  , Prop "id" $ StringVal "1"
+  , Prop "blockedDates" $ ListVal [ IntVal 20]
+  , Prop "cooldown" $ IntVal 2
+  , Prop "availability" $ IntVal 5
+  , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Vocal"
+                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                                             , StringVal "Sat"
+                                                             , StringVal "Morning"]
+                                    ]
+                           ]
+  ]
+
+long = ObjVal
+  [ Prop "name" $ StringVal "long"
+  , Prop "id" $ StringVal "1"
+  , Prop "blockedDates" $ ListVal [ IntVal 20]
+  , Prop "cooldown" $ IntVal 2
+  , Prop "availability" $ IntVal 5
+  , Prop "roles" $ ListVal [ ObjVal [ Prop "type" $ StringVal "Vocal"
+                                    , Prop "kinds" $ ListVal [ StringVal "Sun"
+                                                             , StringVal "Sat"
                                                              , StringVal "Morning"]
                                     ]
                            ]
@@ -98,12 +125,13 @@ lok = ObjVal
 
 
 resources :: [Val]
-resources = [jacky, timmy, lok]
+resources = [jacky, timmy, lok, chung, long]
 
 job1 = ObjVal
   [ Prop "date" $ IntVal 6
   , Prop "kind" $ StringVal "Sat"
   , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"
                            , StringVal "Vocal"]
   ]
 
@@ -111,33 +139,65 @@ job2 = ObjVal
   [ Prop "date" $ IntVal 6
   , Prop "kind" $ StringVal "Morning"
   , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"
                            , StringVal "Vocal"]
   ]
 
-
 job3 = ObjVal
+  [ Prop "date" $ IntVal 6
+  , Prop "kind" $ StringVal "Sun"
+  , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"
+                           , StringVal "Vocal"]
+  ]
+
+job4 = ObjVal
   [ Prop "date" $ IntVal 13
+  , Prop "kind" $ StringVal "Sat"
+  , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"
+                           , StringVal "Vocal"]
+  ]
+  
+job5 = ObjVal
+  [ Prop "date" $ IntVal 13
+  , Prop "kind" $ StringVal "Morning"
+  , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"
+                           , StringVal "Vocal"]
+  ]
+
+job6 = ObjVal
+  [ Prop "date" $ IntVal 13
+  , Prop "kind" $ StringVal "Sun"
+  , Prop "roles" $ ListVal [ StringVal "Leader"
+                           , StringVal "Vocal"
+                           , StringVal "Vocal"]
+  ]
+
+job7 = ObjVal
+  [ Prop "date" $ IntVal 20
   , Prop "kind" $ StringVal "Sat"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
   ]
   
-job4 = ObjVal
-  [ Prop "date" $ IntVal 13
+job8 = ObjVal
+  [ Prop "date" $ IntVal 20
   , Prop "kind" $ StringVal "Morning"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
   ]
 
-job5 = ObjVal
-  [ Prop "date" $ IntVal 13
+job9 = ObjVal
+  [ Prop "date" $ IntVal 20
   , Prop "kind" $ StringVal "Sun"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
-  ]
+  ]  
 
 
-jobs = [job1]
+jobs = [job1, job2, job3, job4,job5,job6,job7,job8,job9]
 
 schedules = 
     [ ObjVal [ Prop "job" job1
@@ -159,14 +219,21 @@ schedules =
                                               , Prop "res" timmy]
                                      , ObjVal [ Prop "role" $ StringVal "Vocal"
                                               , Prop "index" $ IntVal 1
-                                              , Prop "res" timmy]
+                                              , Prop "res" lok]
+                                     ]
+             ]
+    , ObjVal [ Prop "job" job3
+             , Prop "index" $ IntVal 1
+             , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
+                                              , Prop "index" $ IntVal 0
+                                              , Prop "res" jacky]
+                                     , ObjVal [ Prop "role" $ StringVal "Vocal"
+                                              , Prop "index" $ IntVal 1
+                                              , Prop "res" chung]
                                      ]
              ]  
     ]
 
-
-
-test = schedule rules [] jobs resources
 
 rule1 = GreaterEq
          (ExpVal (Diff 
@@ -184,14 +251,38 @@ rule1 = GreaterEq
 
 rule2 = Not $ ExpVal $ In (ExpVal (Get "date" $ ContextVal Job)) (ExpVal (Get "blockedDates" $ ContextVal Res))
 rule3 = GreaterEq
-        (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] $ Eq (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
         (ExpVal $ Get "availability" $ ContextVal Res)
+        (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] $ Eq (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
+        
+rule4 = GreaterEq
+        (ExpVal $ Count $ (ExpVal $ Where ["kinds"]
+                           (In
+                           (ExpVal $ Get "kind" $ ContextVal Job)
+                           (ExpVal $ Get "roles" $ ContextVal Res)
+                           )
+                          )
+        )
+        (IntVal 1)
 
-rule4 = Where ["roles", "kinds"] $ In (ExpVal $ Get "kind" $ ContextVal Job) (ContextVal Res)
-  
-rules = [rule1]
+rules = [rule1,rule2,rule3,rule4]
 
-result = eval (ListVal test, job1, jacky) rule1
+result = eval (ListVal test, job1, jacky) rule4
+
+test = schedule rules schedules jobs resources
+
+
+displaySchedules :: [Val] -> IO ()
+displaySchedules [] = putStrLn ""
+displaySchedules (sch:schs) = do
+  let (IntVal date) = get "date" $ get "job" sch
+  putStrLn $ show date
+  let (ListVal ts) = get "team" $ sch
+  mapM (\t-> putStrLn $ show $ get "name" $ get "res" t ) ts
+  displaySchedules schs
+
+-- displayTeam :: Val -> IO()
+-- displayTeam (ListVal ts) = 
+
 
 genTeam :: Int -> Val -> Val -> Val
 genTeam i ro re = ObjVal [ Prop "role" ro
