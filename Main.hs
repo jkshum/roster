@@ -19,6 +19,7 @@ data Exp = Where [Key] Exp
          | GreaterEq Val Val
          | Eq Val Val
          | Diff Val Val
+         | Any Val Val
          | In Val Val
          | Not Val
          deriving (Show, Eq, Ord)
@@ -43,8 +44,8 @@ instance Show (Val) where
   show (IntVal a) = show a
   show (BoolVal a) = show a
   show (StringVal a) = show a
-  show (ObjVal a) = show a
-  show (ListVal a) = show a
+  show (ObjVal a) = "obj" ++ show a 
+  show (ListVal a) = "list" ++ show a
   show (ExpVal a) = show a
   show (ContextVal a) = show a
   show None = show "None"
@@ -194,10 +195,10 @@ job9 = ObjVal
   , Prop "kind" $ StringVal "Sun"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
-  ]  
+  ]
 
 
-jobs = [job1, job2, job3, job4,job5,job6,job7,job8,job9]
+jobs = [job1, job2, job3, job4, job5, job6, job7, job8, job9]
 
 schedules = 
     [ ObjVal [ Prop "job" job1
@@ -254,22 +255,16 @@ rule3 = GreaterEq
         (ExpVal $ Get "availability" $ ContextVal Res)
         (ExpVal $ Count $ ExpVal $ Where ["team", "res", "name"] $ Eq (ExpVal $ Get "name" $ ContextVal Res) (ContextVal Schedules))
         
-rule4 = GreaterEq
-        (ExpVal $ Count $ (ExpVal $ Where ["kinds"]
-                           (In
-                           (ExpVal $ Get "kind" $ ContextVal Job)
-                           (ExpVal $ Get "roles" $ ContextVal Res)
-                           )
-                          )
-        )
-        (IntVal 1)
+rule4 = GreaterEq (ExpVal $ Count $ ExpVal $ Where ["type"] $ Eq (ExpVal $ Get "role" $ ContextVal Job) (ExpVal $ Get "roles" $ ContextVal Res)) (IntVal 1)
+
+rule5 = Where ["type"] $ Eq (StringVal "Leader") (ExpVal $ Get "roles" jacky)
+
 
 rules = [rule1,rule2,rule3,rule4]
 
-result = eval (ListVal test, job1, jacky) rule4
+result = eval (ListVal test, job1, jacky) rule5
 
 test = schedule rules schedules jobs resources
-
 
 displaySchedules :: [Val] -> IO ()
 displaySchedules [] = putStrLn ""
@@ -283,7 +278,6 @@ displaySchedules (sch:schs) = do
 -- displayTeam :: Val -> IO()
 -- displayTeam (ListVal ts) = 
 
-
 genTeam :: Int -> Val -> Val -> Val
 genTeam i ro re = ObjVal [ Prop "role" ro
                          , Prop "index" $ IntVal i
@@ -293,6 +287,10 @@ genSchedule :: Int -> Val -> Val -> Val
 genSchedule i j t = ObjVal [ Prop "index" $ IntVal i
                            , Prop "job" j
                            , Prop "team" t]
+
+-- genSubJobs:: String -> String -> Val -> [Val]
+-- genSubJobs k k' (ObjVal ps) = let (ListVal res) = get k (ObjVal ps)
+--                               in map (\x-> ObjVal $ ps ++ [Prop k' x]) res
                     
 schedule :: [Exp] -> [Val] -> [Val] -> [Val] -> [Val]
 schedule es schs js re = [ genSchedule i j $ ListVal $ assign es schs j re
@@ -300,15 +298,18 @@ schedule es schs js re = [ genSchedule i j $ ListVal $ assign es schs j re
                           
 assign :: [Exp] -> [Val] -> Val -> [Val] -> [Val]
 assign es schs j rs = let (ListVal ros) = get "roles" j
-                      in [ genTeam i ro $ match es schs j rs
-                         | (i,ro) <- zip [0.. (length ros - 1)] ros]
-                         
+                      in [ genTeam i ro $ match es schs (addProp "role" ro j) rs
+                         | (i, ro) <- zip [0.. (length ros - 1)] ros]
+
+addProp :: String -> Val -> Val -> Val
+addProp k v (ObjVal ps) = ObjVal $ ps ++ [Prop k v]
+
 match :: [Exp] -> [Val] -> Val -> [Val] -> Val
 -- handle none
 match es schs j rs =
   let found = filter (\r ->
                        and [ let (BoolVal res) = eval (ListVal schs, j, r) e
-                             in res | e <- es]) rs
+                             in res | e <- es] ) rs
   in if length found == 0 then None
      else head found
 
@@ -329,6 +330,8 @@ eval :: (Val,Val,Val) -> Exp -> Val
 
 eval ctx (Where ks (Eq v1 v2)) = where' (==) ks (getVal ctx v1) (getVal ctx v2)
 eval ctx (Where ks (In v1 v2)) = where' valIn ks (getVal ctx v1) (getVal ctx v2)
+eval ctx (Where ks (Any v1 v2)) = where' any' ks (getVal ctx v1) (getVal ctx v2)
+
  -- where' ks (getVal ctx v) (getVal ctx os)
 
 eval ctx (Last v) = let (ListVal res) = (getVal ctx v)
@@ -353,7 +356,10 @@ eval ctx (Not v) = let (BoolVal res) = getVal ctx v
 
 valIn :: Val -> Val -> Bool
 valIn v1 (ListVal vs) = elem v1 vs
-               
+
+any' :: Val -> Val -> Bool
+any' (ListVal xs) v = elem v xs
+
 where' :: (Val -> Val -> Bool) -> [Key] -> Val -> Val -> Val
 where' fn ks v (ListVal os) = ListVal [ o | o <- os
                                           , checkKeyVal fn ks v o]
