@@ -224,7 +224,7 @@ schedules =
                                      ]
              ]
     , ObjVal [ Prop "job" job3
-             , Prop "index" $ IntVal 1
+             , Prop "index" $ IntVal 2
              , Prop "team" $ ListVal [ ObjVal [ Prop "role" $ StringVal "Leader"
                                               , Prop "index" $ IntVal 0
                                               , Prop "res" jacky]
@@ -257,14 +257,27 @@ rule3 = GreaterEq
         
 rule4 = GreaterEq (ExpVal $ Count $ ExpVal $ Where ["type"] $ Eq (ExpVal $ Get "role" $ ContextVal Job) (ExpVal $ Get "roles" $ ContextVal Res)) (IntVal 1)
 
+-- rule5 
 rule5 = Where ["type"] $ Eq (StringVal "Leader") (ExpVal $ Get "roles" jacky)
 
+rule6 = (Diff 
+                  (ExpVal $ Count $ ContextVal Schedules)
+                  (ExpVal (Get "index" (ExpVal $ Last $ ExpVal $
+                                        Where ["team", "res", "name"]
+                                        $ Eq (ExpVal $ Get "name" $ ContextVal Res)
+                                        (ContextVal Schedules)
+                                       )
+                          )
+                  )
+                 )
 
-rules = [rule1,rule2,rule3,rule4]
 
-result = eval (ListVal test, job1, jacky) rule5
 
-test = schedule rules schedules jobs resources
+rules = [rule1, rule2, rule3, rule4]
+
+result = eval (ListVal [None, None], job1, jacky) rule6
+
+test = schedule rules [None, None] jobs resources
 
 displaySchedules :: [Val] -> IO ()
 displaySchedules [] = putStrLn ""
@@ -347,7 +360,7 @@ eval ctx (GreaterEq v1 v2) = BoolVal $ (getVal ctx v1) >= (getVal ctx v2)
 
 eval ctx (Eq v1 v2) = BoolVal $ (getVal ctx v1) == (getVal ctx v2)
 
-eval ctx (Diff v1 v2) = liftIntVal2 (+) (noneToZero $ getVal ctx v1) (noneToZero $ getVal ctx v2)
+eval ctx (Diff v1 v2) = liftIntVal2 (-) (noneToZero $ getVal ctx v1) (noneToZero $ getVal ctx v2)
 
 eval ctx (In v1 v2) = BoolVal $ valIn (getVal ctx v1) (getVal ctx v2)
 
