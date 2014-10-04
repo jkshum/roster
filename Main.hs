@@ -130,6 +130,7 @@ resources = [jacky, timmy, lok, chung, long]
 
 job1 = ObjVal
   [ Prop "date" $ IntVal 6
+  , Prop "id" $ StringVal "0"
   , Prop "kind" $ StringVal "Sat"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"
@@ -138,6 +139,7 @@ job1 = ObjVal
 
 job2 = ObjVal
   [ Prop "date" $ IntVal 6
+  , Prop "id" $ StringVal "1"
   , Prop "kind" $ StringVal "Morning"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"
@@ -146,6 +148,7 @@ job2 = ObjVal
 
 job3 = ObjVal
   [ Prop "date" $ IntVal 6
+  , Prop "id" $ StringVal "2"
   , Prop "kind" $ StringVal "Sun"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"
@@ -154,6 +157,7 @@ job3 = ObjVal
 
 job4 = ObjVal
   [ Prop "date" $ IntVal 13
+  , Prop "id" $ StringVal "3"
   , Prop "kind" $ StringVal "Sat"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"
@@ -162,6 +166,7 @@ job4 = ObjVal
   
 job5 = ObjVal
   [ Prop "date" $ IntVal 13
+  , Prop "id" $ StringVal "4"
   , Prop "kind" $ StringVal "Morning"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"
@@ -170,6 +175,7 @@ job5 = ObjVal
 
 job6 = ObjVal
   [ Prop "date" $ IntVal 13
+  , Prop "id" $ StringVal "5"
   , Prop "kind" $ StringVal "Sun"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"
@@ -178,6 +184,7 @@ job6 = ObjVal
 
 job7 = ObjVal
   [ Prop "date" $ IntVal 20
+  , Prop "id" $ StringVal "6"
   , Prop "kind" $ StringVal "Sat"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
@@ -185,6 +192,8 @@ job7 = ObjVal
   
 job8 = ObjVal
   [ Prop "date" $ IntVal 20
+  , Prop "id" $ StringVal "7"
+
   , Prop "kind" $ StringVal "Morning"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
@@ -192,6 +201,8 @@ job8 = ObjVal
 
 job9 = ObjVal
   [ Prop "date" $ IntVal 20
+  , Prop "id" $ StringVal "8"
+
   , Prop "kind" $ StringVal "Sun"
   , Prop "roles" $ ListVal [ StringVal "Leader"
                            , StringVal "Vocal"]
@@ -257,37 +268,57 @@ rule3 = GreaterEq
         
 rule4 = GreaterEq (ExpVal $ Count $ ExpVal $ Where ["type"] $ Eq (ExpVal $ Get "role" $ ContextVal Job) (ExpVal $ Get "roles" $ ContextVal Res)) (IntVal 1)
 
--- rule5 
-rule5 = Where ["type"] $ Eq (StringVal "Leader") (ExpVal $ Get "roles" jacky)
+-- rule5
+
+rule5 = Eq (ExpVal $Count $ ExpVal $ Where ["team", "res", "name"] $
+            Eq (ExpVal $ Get "name" $ ContextVal Res)
+            (ExpVal (Where ["job", "id"] $ Eq (ExpVal $ Get "id" $ ContextVal Job)
+                    (ContextVal Schedules)))
+           )
+        (IntVal 0)
+
+-- rule5 = Where ["type"] $ Eq (StringVal "Leader") (ExpVal $ Get "roles" jacky)
 
 rule6 = (Diff 
-                  (ExpVal $ Count $ ContextVal Schedules)
-                  (ExpVal (Get "index" (ExpVal $ Last $ ExpVal $
-                                        Where ["team", "res", "name"]
-                                        $ Eq (ExpVal $ Get "name" $ ContextVal Res)
-                                        (ContextVal Schedules)
-                                       )
-                          )
-                  )
+         (ExpVal $ Count $ ContextVal Schedules)
+         (ExpVal (Get "index" (ExpVal $ Last $ ExpVal $
+                               Where ["team", "res", "name"]
+                               $ Eq (ExpVal $ Get "name" $ ContextVal Res)
+                               (ContextVal Schedules)
+                              )
                  )
+         )
+        )
+
+rules = [rule1, rule2, rule3, rule4, rule5]
+
+result = eval (ListVal schedules, job1, jacky) $ Eq (ExpVal $Count $ ExpVal $ Where ["team", "res", "name"] $
+            Eq (ExpVal $ Get "name" $ ContextVal Res)
+            (ExpVal (Where ["job", "id"] $ Eq (ExpVal $ Get "id" $ ContextVal Job)
+                    (ContextVal Schedules)))
+           )
+        (IntVal 0)
 
 
-
-rules = [rule1, rule2, rule3, rule4]
-
-result = eval (ListVal [None, None], job1, jacky) rule6
 
 test = schedule rules [None, None] jobs resources
 
 displaySchedules :: [Val] -> IO ()
 displaySchedules [] = putStrLn ""
-displaySchedules (sch:schs) = do
-  let (IntVal date) = get "date" $ get "job" sch
-  putStrLn $ show date
-  let (ListVal ts) = get "team" $ sch
-  mapM (\t-> putStrLn $ show $ get "name" $ get "res" t ) ts
-  displaySchedules schs
+displaySchedules (sch:schs) =
+  do
+    let res = get "date" $ get "job" sch
+      in case res of
+      None -> putStrLn ""
+      (IntVal date) -> putStrLn $ show date
+        
+    let team = get "team" $ sch
+      in case team of
+      None -> putStrLn ""
+      (ListVal ts) -> putStrLn $ show $ map (\t-> get "name" $ get "res" t ) ts
 
+    displaySchedules schs
+  
 -- displayTeam :: Val -> IO()
 -- displayTeam (ListVal ts) = 
 
@@ -306,13 +337,28 @@ genSchedule i j t = ObjVal [ Prop "index" $ IntVal i
 --                               in map (\x-> ObjVal $ ps ++ [Prop k' x]) res
                     
 schedule :: [Exp] -> [Val] -> [Val] -> [Val] -> [Val]
-schedule es schs js re = [ genSchedule i j $ ListVal $ assign es schs j re
-                         | (i, j) <- zip [0.. (length js - 1)] js ]
+schedule es schs [] re = schs
+schedule es schs (j:js) re = let team = ListVal $ assign es schs j re
+                                 i = length schs
+                             in let sch = genSchedule i j team
+                                 in schedule es (schs ++ [sch]) js re
+
+-- schedule es schs js re = [ genSchedule i j $ ListVal $ assign es schs j re
+--                          | (i, j) <- zip [0.. (length js - 1)] js ]
                           
 assign :: [Exp] -> [Val] -> Val -> [Val] -> [Val]
 assign es schs j rs = let (ListVal ros) = get "roles" j
-                      in [ genTeam i ro $ match es schs (addProp "role" ro j) rs
+                          
+                          
+                      in let team = genTeam i ro $ 
                          | (i, ro) <- zip [0.. (length ros - 1)] ros]
+
+assign ::[Val] -> [Exp] -> [Val] -> Val -> [Val] -> [Val]
+role (ro:ros) es schs j rs = match es schs (addProp "role" ro j) rs
+
+-- assign es schs j rs = let (ListVal ros) = get "roles" j
+--                       in [ genTeam i ro $ match es schs (addProp "role" ro j) rs
+--                          | (i, ro) <- zip [0.. (length ros - 1)] ros]
 
 addProp :: String -> Val -> Val -> Val
 addProp k v (ObjVal ps) = ObjVal $ ps ++ [Prop k v]
