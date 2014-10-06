@@ -238,18 +238,11 @@ schedules =
 
 
 rule1 = GreaterEq
-         (ExpVal (Diff 
-                  (ExpVal $ Count $ ContextVal Schedules)
-                  (ExpVal (Get "index" (ExpVal $ Last $ ExpVal $
-                                        Where ["team", "res", "name"]
-                                        $ Eq (ExpVal $ Get "name" $ ContextVal Res)
-                                        (ContextVal Schedules)
-                                       )
-                          )
-                  )
-                 )
-         )
-         (ExpVal (Get "cooldown" $ ContextVal Res))
+        (
+          Where ["objs", "res", "name"] $ Eq (ExpVal $ Get "name" ContextVal Res)  (ExpVal $ Group ["res", "name"] ContextVal Schedules)
+          
+        )        
+        (ExpVal (Get "cooldown" $ ContextVal Res))
 
 rule2 = Not $ ExpVal $ In (ExpVal (Get "date" $ ContextVal Job)) (ExpVal (Get "blockedDates" $ ContextVal Res))
 rule3 = GreaterEq
@@ -356,7 +349,7 @@ noneToZero None = IntVal 0
 noneToZero v = v
 
 eval :: (Val,Val,Val) -> Exp -> Val
-
+eval ctx (Group ks v) = group' ks (getVal ctx v)
 eval ctx (Where ks (Eq v1 v2)) = where' (==) ks (getVal ctx v1) (getVal ctx v2)
 eval ctx (Where ks (In v1 v2)) = where' valIn ks (getVal ctx v1) (getVal ctx v2)
 eval ctx (Where ks (Any v1 v2)) = where' any' ks (getVal ctx v1) (getVal ctx v2)
